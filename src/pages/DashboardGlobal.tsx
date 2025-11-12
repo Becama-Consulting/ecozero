@@ -4,7 +4,16 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Zap, Users, Settings, FileText, LogOut, Shield, Activity } from "lucide-react";
+import { Zap, Users, Settings, FileText, LogOut, Shield, Activity, Key } from "lucide-react";
+import { GenerateCredentialsModal } from "@/components/GenerateCredentialsModal";
+
+interface UserData {
+  id: string;
+  email: string;
+  name: string;
+  departamento?: string;
+  roles: string[];
+}
 
 const DashboardGlobal = () => {
   const navigate = useNavigate();
@@ -16,13 +25,54 @@ const DashboardGlobal = () => {
     activeLines: 0,
     alerts: 0
   });
+  const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
+  const [users, setUsers] = useState<UserData[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   useEffect(() => {
     if (!hasRole("admin_global")) {
       navigate("/");
     }
     loadStats();
+    loadUsers();
   }, [hasRole, navigate]);
+
+  const loadUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, email, name, departamento");
+
+      if (profilesError) throw profilesError;
+
+      // Get roles for each user
+      const usersWithRoles = await Promise.all(
+        (profiles || []).map(async (profile) => {
+          const { data: roles, error: rolesError } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", profile.id);
+
+          if (rolesError) throw rolesError;
+
+          return {
+            id: profile.id,
+            email: profile.email,
+            name: profile.name,
+            departamento: profile.departamento || "N/A",
+            roles: roles?.map((r) => r.role) || [],
+          };
+        })
+      );
+
+      setUsers(usersWithRoles);
+    } catch (error) {
+      console.error("Error loading users:", error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   const loadStats = async () => {
     try {
@@ -204,7 +254,11 @@ const DashboardGlobal = () => {
               >
                 + Nuevo Usuario
               </Button>
-              <Button variant="outline">
+              <Button 
+                variant="outline"
+                onClick={() => setIsCredentialsModalOpen(true)}
+              >
+                <Key className="w-4 h-4 mr-2" />
                 Generar Credenciales
               </Button>
               <Button variant="outline">
@@ -222,6 +276,13 @@ const DashboardGlobal = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Modal de Credenciales */}
+        <GenerateCredentialsModal
+          open={isCredentialsModalOpen}
+          onOpenChange={setIsCredentialsModalOpen}
+          users={users}
+        />
       </main>
     </div>
   );

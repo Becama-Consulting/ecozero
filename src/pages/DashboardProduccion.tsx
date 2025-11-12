@@ -4,8 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertTriangle, Plus, Map } from "lucide-react";
+import { Loader2, AlertTriangle, Plus, Map, Key } from "lucide-react";
 import { toast } from "sonner";
+import { GenerateCredentialsModal } from "@/components/GenerateCredentialsModal";
 
 interface LineaStats {
   id: string;
@@ -17,6 +18,14 @@ interface LineaStats {
   ultima_actualizacion: string;
 }
 
+interface UserData {
+  id: string;
+  email: string;
+  name: string;
+  departamento?: string;
+  roles: string[];
+}
+
 const DashboardProduccion = () => {
   const { user, isAdmin, hasRole } = useAuth();
   const navigate = useNavigate();
@@ -25,6 +34,8 @@ const DashboardProduccion = () => {
   const [totalOFs, setTotalOFs] = useState(0);
   const [completadasHoy, setCompletadasHoy] = useState(0);
   const [alertas, setAlertas] = useState(0);
+  const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
+  const [users, setUsers] = useState<UserData[]>([]);
 
   useEffect(() => {
     if (!user) {
@@ -39,8 +50,43 @@ const DashboardProduccion = () => {
     }
 
     fetchDashboardData();
+    loadUsers();
     setupRealtimeSubscriptions();
   }, [user]);
+
+  const loadUsers = async () => {
+    try {
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, email, name, departamento");
+
+      if (profilesError) throw profilesError;
+
+      // Get roles for each user
+      const usersWithRoles = await Promise.all(
+        (profiles || []).map(async (profile) => {
+          const { data: roles, error: rolesError } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", profile.id);
+
+          if (rolesError) throw rolesError;
+
+          return {
+            id: profile.id,
+            email: profile.email,
+            name: profile.name,
+            departamento: profile.departamento || "N/A",
+            roles: roles?.map((r) => r.role) || [],
+          };
+        })
+      );
+
+      setUsers(usersWithRoles);
+    } catch (error) {
+      console.error("Error loading users:", error);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -309,12 +355,24 @@ const DashboardProduccion = () => {
                 <AlertTriangle className="mr-2 h-5 w-5" />
                 Ver Alertas
               </Button>
-              <Button className="h-auto py-4" variant="outline">
-                ⚙️ Configuración
+              <Button 
+                className="h-auto py-4" 
+                variant="outline"
+                onClick={() => setIsCredentialsModalOpen(true)}
+              >
+                <Key className="mr-2 h-5 w-5" />
+                Generar Credenciales
               </Button>
             </div>
           </CardContent>
         </Card>
+
+        {/* Modal de Credenciales */}
+        <GenerateCredentialsModal
+          open={isCredentialsModalOpen}
+          onOpenChange={setIsCredentialsModalOpen}
+          users={users}
+        />
       </div>
     </div>
   );
