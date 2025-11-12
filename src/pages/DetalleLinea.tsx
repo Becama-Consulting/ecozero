@@ -225,9 +225,7 @@ const DetalleLinea = () => {
                       </TableCell>
                       <TableCell>{of.customer}</TableCell>
                       <TableCell>{getStatusBadge(of.status)}</TableCell>
-                      <TableCell>
-                          {of.profiles?.name || "-"}
-                      </TableCell>
+                      <TableCell>-</TableCell>
                       <TableCell>
                         {new Date(of.created_at).toLocaleDateString("es-ES")}
                       </TableCell>

@@ -75,7 +75,7 @@ const Index = () => {
         {/* Module Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Producción Module */}
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-l-4 border-l-success">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-l-4 border-l-success" onClick={() => navigate("/dashboard/produccion")}>
             <CardHeader>
               <div className="flex items-center space-x-3 mb-2">
                 <div className="status-success rounded-lg p-2">
