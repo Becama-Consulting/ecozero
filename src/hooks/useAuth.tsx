@@ -137,6 +137,57 @@ export const useAuth = () => {
     );
   };
 
+  const getDashboardByRole = async () => {
+    if (!user || userRoles.length === 0) return '/auth';
+    
+    // Admin global ve selector de módulos
+    if (userRoles.some(r => r.role === 'admin_global')) {
+      return '/';
+    }
+    
+    // Para otros roles, obtener departamento del perfil
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('departamento')
+      .eq('id', user.id)
+      .maybeSingle();
+    
+    const departamento = profile?.departamento;
+    
+    // Admin departamento va a su dashboard
+    if (userRoles.some(r => r.role === 'admin_departamento')) {
+      switch(departamento) {
+        case 'produccion': return '/dashboard/produccion';
+        case 'logistica': return '/dashboard/logistica';
+        case 'compras': return '/dashboard/compras';
+        case 'rrhh': return '/dashboard/rrhh';
+        case 'comercial': return '/dashboard/comercial';
+        case 'administrativo': return '/dashboard/administrativo';
+        default: return '/dashboard/produccion';
+      }
+    }
+    
+    // Supervisor va a su área
+    if (userRoles.some(r => r.role === 'supervisor')) {
+      switch(departamento) {
+        case 'produccion': return '/dashboard/produccion';
+        case 'logistica': return '/dashboard/logistica';
+        case 'compras': return '/dashboard/compras';
+        case 'rrhh': return '/dashboard/rrhh';
+        case 'comercial': return '/dashboard/comercial';
+        case 'administrativo': return '/dashboard/administrativo';
+        default: return '/dashboard/produccion';
+      }
+    }
+    
+    // Operario y quality van a producción
+    if (userRoles.some(r => r.role === 'operario' || r.role === 'quality')) {
+      return '/dashboard/produccion';
+    }
+    
+    return '/';
+  };
+
   return {
     user,
     session,
@@ -147,5 +198,6 @@ export const useAuth = () => {
     signOut,
     hasRole,
     isAdmin,
+    getDashboardByRole,
   };
 };

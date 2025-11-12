@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Loader2, AlertTriangle, Plus, Map, Key } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateCredentialsModal } from "@/components/GenerateCredentialsModal";
+import { CreateOFModal } from "@/components/CreateOFModal";
+import { OFFilters, type OFFilters as OFFiltersType } from "@/components/OFFilters";
 
 interface LineaStats {
   id: string;
@@ -35,7 +37,9 @@ const DashboardProduccion = () => {
   const [completadasHoy, setCompletadasHoy] = useState(0);
   const [alertas, setAlertas] = useState(0);
   const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
+  const [isCreateOFModalOpen, setIsCreateOFModalOpen] = useState(false);
   const [users, setUsers] = useState<UserData[]>([]);
+  const [filters, setFilters] = useState<OFFiltersType>({});
 
   useEffect(() => {
     if (!user) return;
@@ -91,6 +95,17 @@ const DashboardProduccion = () => {
         .order("name");
 
       if (linesError) throw linesError;
+
+      // Build OF query with filters
+      let ofQuery = supabase
+        .from("fabrication_orders")
+        .select("*", { count: "exact", head: true });
+
+      if (filters.status) ofQuery = ofQuery.eq("status", filters.status as any);
+      if (filters.lineId) ofQuery = ofQuery.eq("line_id", filters.lineId);
+      if (filters.customer) ofQuery = ofQuery.ilike("customer", `%${filters.customer}%`);
+      if (filters.dateFrom) ofQuery = ofQuery.gte("created_at", filters.dateFrom);
+      if (filters.dateTo) ofQuery = ofQuery.lte("created_at", filters.dateTo);
 
       // Fetch OFs for each line
       const lineasStats: LineaStats[] = await Promise.all(
@@ -337,7 +352,7 @@ const DashboardProduccion = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Button className="h-auto py-4" onClick={() => navigate("/dashboard/produccion/nueva-of")}>
+              <Button className="h-auto py-4" onClick={() => setIsCreateOFModalOpen(true)}>
                 <Plus className="mr-2 h-5 w-5" />
                 Nueva OF
               </Button>
@@ -361,11 +376,16 @@ const DashboardProduccion = () => {
           </CardContent>
         </Card>
 
-        {/* Modal de Credenciales */}
+        {/* Modals */}
         <GenerateCredentialsModal
           open={isCredentialsModalOpen}
           onOpenChange={setIsCredentialsModalOpen}
           users={users}
+        />
+        <CreateOFModal
+          isOpen={isCreateOFModalOpen}
+          onClose={() => setIsCreateOFModalOpen(false)}
+          onSuccess={fetchDashboardData}
         />
       </div>
     </div>

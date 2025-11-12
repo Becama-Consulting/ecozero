@@ -6,14 +6,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Zap, LogOut, Factory, Package, Users, BarChart3, Settings } from "lucide-react";
 
 const Index = () => {
-  const { user, signOut, userRoles, isAdmin } = useAuth();
+  const { user, signOut, userRoles, isAdmin, getDashboardByRole, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user && !isAdmin()) {
-      navigate("/dashboard/produccion", { replace: true });
-    }
-  }, [user, isAdmin, navigate]);
+    const handleRedirect = async () => {
+      if (!loading && user && !isAdmin()) {
+        const dashboardRoute = await getDashboardByRole();
+        if (dashboardRoute !== '/') {
+          navigate(dashboardRoute, { replace: true });
+        }
+      }
+    };
+
+    handleRedirect();
+  }, [loading, user, isAdmin, getDashboardByRole, navigate]);
 
   const handleSignOut = async () => {
     await signOut();
