@@ -17,12 +17,8 @@ interface FabricationOrder {
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
-  line: {
-    name: string;
-  } | null;
-  supervisor: {
-    name: string;
-  } | null;
+  line_id: string | null;
+  supervisor_id: string | null;
 }
 
 interface ProductionStep {
@@ -34,9 +30,7 @@ interface ProductionStep {
   photos: string[];
   started_at: string | null;
   completed_at: string | null;
-  assigned_user: {
-    name: string;
-  } | null;
+  assigned_to: string | null;
 }
 
 const STEP_NAMES = [
@@ -65,11 +59,7 @@ const FichaOF = () => {
       // Fetch OF data
       const { data: ofData, error: ofError } = await supabase
         .from("fabrication_orders")
-        .select(`
-          *,
-          line:line_id(name),
-          supervisor:supervisor_id(name)
-        `)
+        .select("*")
         .eq("id", ofId)
         .single();
 
@@ -79,10 +69,7 @@ const FichaOF = () => {
       // Fetch production steps
       const { data: stepsData, error: stepsError } = await supabase
         .from("production_steps")
-        .select(`
-          *,
-          assigned_user:assigned_to(name)
-        `)
+        .select("*")
         .eq("of_id", ofId)
         .order("step_number");
 
@@ -183,7 +170,7 @@ const FichaOF = () => {
                 OF #{of.sap_id || of.id.slice(0, 8)}
               </h1>
               <p className="text-muted-foreground mt-1">
-                Cliente: {of.customer} | Línea: {of.line?.name} | Supervisor: {of.supervisor?.name}
+                Cliente: {of.customer} | Línea: {of.line_id ? "Asignada" : "Sin asignar"} | Supervisor: {of.supervisor_id ? "Asignado" : "Sin asignar"}
               </p>
             </div>
             <Badge className={
@@ -212,11 +199,11 @@ const FichaOF = () => {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Línea</p>
-              <p>{of.line?.name || "Sin asignar"}</p>
+              <p>{of.line_id || "Sin asignar"}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Supervisor</p>
-              <p>{of.supervisor?.name || "Sin asignar"}</p>
+              <p>{of.supervisor_id || "Sin asignar"}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Fecha inicio</p>
@@ -271,9 +258,9 @@ const FichaOF = () => {
                          step.status === "en_proceso" ? "⊘ EN PROGRESO" :
                          "○ PENDIENTE"}
                       </p>
-                      {step.assigned_user && (
+                      {step.assigned_to && (
                         <p className="text-sm">
-                          <span className="font-medium">Operario:</span> {step.assigned_user.name}
+                          <span className="font-medium">Operario:</span> {step.assigned_to}
                         </p>
                       )}
                       {step.started_at && (

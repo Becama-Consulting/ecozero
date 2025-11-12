@@ -29,9 +29,6 @@ interface FabricationOrder {
   status: string;
   created_at: string;
   assignee_id: string | null;
-  profiles?: {
-    name: string;
-  };
 }
 
 const DetalleLinea = () => {
@@ -61,10 +58,7 @@ const DetalleLinea = () => {
       // Fetch OFs
       const { data: ofsData, error: ofsError } = await supabase
         .from("fabrication_orders")
-        .select(`
-          *,
-          profiles:assignee_id(name)
-        `)
+        .select("*")
         .eq("line_id", lineaId)
         .order("created_at", { ascending: false });
 
@@ -187,11 +181,6 @@ const DetalleLinea = () => {
                           <p className="font-bold text-lg">OF #{of.sap_id || of.id.slice(0, 8)}</p>
                           <p className="text-sm text-muted-foreground mt-1">{of.customer}</p>
                           <p className="text-xs mt-2">{getStatusBadge(of.status)}</p>
-                          {of.profiles && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {of.profiles.name}
-                            </p>
-                          )}
                         </>
                       ) : (
                         <p className="text-muted-foreground text-sm py-4">LIBRE</p>
@@ -237,7 +226,7 @@ const DetalleLinea = () => {
                       <TableCell>{of.customer}</TableCell>
                       <TableCell>{getStatusBadge(of.status)}</TableCell>
                       <TableCell>
-                        {of.profiles?.name || "-"}
+                          {of.profiles?.name || "-"}
                       </TableCell>
                       <TableCell>
                         {new Date(of.created_at).toLocaleDateString("es-ES")}
