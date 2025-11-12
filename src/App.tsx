@@ -7,6 +7,10 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import AdminUsers from "./pages/AdminUsers";
 import DashboardGlobal from "./pages/DashboardGlobal";
+import DashboardProduccion from "./pages/DashboardProduccion";
+import DetalleLinea from "./pages/DetalleLinea";
+import FichaOF from "./pages/FichaOF";
+import Alertas from "./pages/Alertas";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -33,6 +37,38 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <AdminUsers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/produccion"
+            element={
+              <ProtectedRoute>
+                <DashboardProduccion />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/produccion/linea/:lineaId"
+            element={
+              <ProtectedRoute>
+                <DetalleLinea />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/produccion/of/:ofId"
+            element={
+              <ProtectedRoute>
+                <FichaOF />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/produccion/alertas"
+            element={
+              <ProtectedRoute>
+                <Alertas />
               </ProtectedRoute>
             }
           />
