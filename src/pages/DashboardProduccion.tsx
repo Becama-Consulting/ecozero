@@ -332,7 +332,7 @@ const DashboardProduccion = () => {
                     Alertas
                   </Button>
                   <Button
-                    onClick={() => navigate("/dashboard/produccion/nueva-of")}
+                    onClick={() => setIsCreateOFModalOpen(true)}
                     variant="outline"
                     size="sm"
                   >
@@ -344,6 +344,15 @@ const DashboardProduccion = () => {
             </Card>
           ))}
         </div>
+
+        {/* Filtros */}
+        <OFFilters 
+          onFilterChange={(f) => {
+            setFilters(f);
+            fetchDashboardData();
+          }}
+          lines={lineas}
+        />
 
         {/* Acciones Rápidas */}
         <Card>
