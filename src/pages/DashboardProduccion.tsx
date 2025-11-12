@@ -96,23 +96,14 @@ const DashboardProduccion = () => {
 
       if (linesError) throw linesError;
 
-      // Build OF query with filters
-      let ofQuery = supabase
-        .from("fabrication_orders")
-        .select("*", { count: "exact", head: true });
-
-      if (filters.status) ofQuery = ofQuery.eq("status", filters.status as any);
-      if (filters.lineId) ofQuery = ofQuery.eq("line_id", filters.lineId);
-      if (filters.customer) ofQuery = ofQuery.ilike("customer", `%${filters.customer}%`);
-      if (filters.dateFrom) ofQuery = ofQuery.gte("created_at", filters.dateFrom);
-      if (filters.dateTo) ofQuery = ofQuery.lte("created_at", filters.dateTo);
+      // Applied filters are now handled when fetching specific data below
 
       // Fetch OFs for each line
       const lineasStats: LineaStats[] = await Promise.all(
         (lines || []).map(async (line) => {
           const { count } = await supabase
             .from("fabrication_orders")
-            .select("*", { count: "exact", head: true })
+            .select("id", { count: "exact", head: true })
             .eq("line_id", line.id)
             .in("status", ["pendiente", "en_proceso"]);
 
@@ -133,7 +124,7 @@ const DashboardProduccion = () => {
       // Fetch total OFs
       const { count: totalCount } = await supabase
         .from("fabrication_orders")
-        .select("*", { count: "exact", head: true })
+        .select("id", { count: "exact", head: true })
         .in("status", ["pendiente", "en_proceso"]);
 
       setTotalOFs(totalCount || 0);
@@ -144,7 +135,7 @@ const DashboardProduccion = () => {
       
       const { count: completedCount } = await supabase
         .from("fabrication_orders")
-        .select("*", { count: "exact", head: true })
+        .select("id", { count: "exact", head: true })
         .eq("status", "completada")
         .gte("completed_at", today.toISOString());
 
@@ -153,7 +144,7 @@ const DashboardProduccion = () => {
       // Fetch active alerts
       const { count: alertsCount } = await supabase
         .from("alerts")
-        .select("*", { count: "exact", head: true })
+        .select("id", { count: "exact", head: true })
         .is("resolved_at", null);
 
       setAlertas(alertsCount || 0);

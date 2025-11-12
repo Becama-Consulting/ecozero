@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,9 @@ import { Zap } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { signIn, user } = useAuth();
+  const { signIn, user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
+  const hasRedirected = useRef(false);
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState("");
@@ -19,10 +20,11 @@ const Auth = () => {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (user) {
-      navigate("/");
+    if (!authLoading && user && !hasRedirected.current) {
+      hasRedirected.current = true;
+      navigate("/", { replace: true });
     }
-  }, [user, navigate]);
+  }, [authLoading, user, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,10 +33,8 @@ const Auth = () => {
     const { error } = await signIn(loginEmail, loginPassword);
     
     if (!error) {
-      // Pequeño delay para que se carguen los roles antes del redirect
-      setTimeout(() => {
-        navigate("/");
-      }, 300);
+      // El redirect lo manejará el useEffect arriba
+      hasRedirected.current = false;
     }
     
     setLoading(false);

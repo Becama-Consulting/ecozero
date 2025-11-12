@@ -14,24 +14,14 @@ const Index = () => {
     const handleRedirect = async () => {
       // Evitar múltiples redirects
       if (hasRedirected.current) return;
-      
-      console.log('🔍 Index.tsx - Checking redirect:', {
-        loading,
-        user: user?.email,
-        userRoles,
-        isAdmin: isAdmin()
-      });
 
       if (!loading && user && !isAdmin()) {
         hasRedirected.current = true;
         const dashboardRoute = await getDashboardByRole();
-        console.log('🚀 Redirecting to:', dashboardRoute);
         
         if (dashboardRoute !== '/') {
           navigate(dashboardRoute, { replace: true });
         }
-      } else if (!loading && user && isAdmin()) {
-        console.log('✅ Admin detected - staying on Index page (selector)');
       }
     };
 
