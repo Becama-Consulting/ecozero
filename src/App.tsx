@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import AdminUsers from "./pages/AdminUsers";
+import DashboardGlobal from "./pages/DashboardGlobal";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -19,6 +20,14 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route
+            path="/dashboard/global"
+            element={
+              <ProtectedRoute>
+                <DashboardGlobal />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/admin/users"
             element={

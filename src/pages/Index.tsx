@@ -41,11 +41,11 @@ const Index = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate("/admin/users")}
+                onClick={() => navigate("/dashboard/global")}
                 className="touch-target"
               >
                 <Settings className="w-4 h-4 mr-2" />
-                Admin
+                Admin Panel
               </Button>
             )}
             <Button

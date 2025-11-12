@@ -11,8 +11,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Trash2, ArrowLeft } from "lucide-react";
+import { Loader2, Plus, Trash2, ArrowLeft, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { GenerateCredentialsModal } from "@/components/GenerateCredentialsModal";
 
 interface UserData {
   id: string;
@@ -32,6 +33,7 @@ const AdminUsers = () => {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<UserData[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
   
   // Form state
   const [newEmail, setNewEmail] = useState("");
@@ -136,7 +138,11 @@ const AdminUsers = () => {
       // Step 2: Update profile with department
       const { error: profileError } = await supabase
         .from("profiles")
-        .update({ departamento: newDepartamento || null })
+        .update({ 
+          departamento: newDepartamento 
+            ? newDepartamento as "produccion" | "logistica" | "compras" | "rrhh" | "comercial" | "administrativo"
+            : null 
+        })
         .eq("id", authData.user.id);
 
       if (profileError) throw profileError;
@@ -272,13 +278,22 @@ const AdminUsers = () => {
               <p className="text-xs text-muted-foreground">Panel administrativo</p>
             </div>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="status-success touch-target">
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo Usuario
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setIsCredentialsModalOpen(true)}
+              variant="outline"
+              className="touch-target"
+            >
+              <Key className="w-4 h-4 mr-2" />
+              Generar Credenciales
+            </Button>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="status-success touch-target">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Usuario
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Crear Nuevo Usuario</DialogTitle>
@@ -359,8 +374,21 @@ const AdminUsers = () => {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
       </header>
+
+      {/* Generate Credentials Modal */}
+      <GenerateCredentialsModal
+        open={isCredentialsModalOpen}
+        onOpenChange={setIsCredentialsModalOpen}
+        users={users.map(u => ({
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          departamento: u.departamento === "N/A" ? null : u.departamento
+        }))}
+      />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">
