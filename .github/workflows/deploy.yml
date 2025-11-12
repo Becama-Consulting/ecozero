@@ -22,32 +22,30 @@ jobs:
           npm ci || npm install
           npm run build
 
-      - name: Decode SSH key
+      - name: Setup SSH key
         run: |
-          echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > private_key
-          chmod 600 private_key
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
       - name: Test SSH connection
         run: |
-          echo "🔍 Probando conexión SSH con la clave decodificada..."
-          ssh -i private_key -o StrictHostKeyChecking=no ubuntu@${{ secrets.VPS_HOST }} "echo ✅ Conexión exitosa desde GitHub Actions"
+          echo "🔍 Probando conexión SSH..."
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ubuntu@${{ secrets.VPS_HOST }} "echo ✅ Conexión exitosa"
 
       - name: Deploy to VPS
-        uses: appleboy/scp-action@v0.1.4
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key_path: "private_key"
-          source: "dist/**,deploy.sh"
-          target: "/srv/repos/${{ github.event.repository.name }}"
-          strip_components: 0
+        run: |
+          echo "📦 Copiando archivos al VPS..."
+          rsync -avz --delete -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            dist/ ubuntu@${{ secrets.VPS_HOST }}:/srv/repos/ecozero/dist/
+          
+          echo "📋 Copiando script de deploy..."
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            deploy.sh ubuntu@${{ secrets.VPS_HOST }}:/srv/repos/ecozero/
 
-      - name: Execute deploy script on VPS
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key_path: "private_key"
-          script: |
-            cd /srv/repos/${{ github.event.repository.name }}
-            ./deploy.sh
+      - name: Execute deploy script
+        run: |
+          echo "🚀 Ejecutando deploy en el VPS..."
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ubuntu@${{ secrets.VPS_HOST }} "cd /srv/repos/ecozero && ./deploy.sh"
