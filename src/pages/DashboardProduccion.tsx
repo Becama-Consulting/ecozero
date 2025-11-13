@@ -4,11 +4,13 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Loader2, AlertTriangle, Plus, Map, Key } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateCredentialsModal } from "@/components/GenerateCredentialsModal";
 import { CreateOFModal } from "@/components/CreateOFModal";
 import { OFFilters, type OFFilters as OFFiltersType } from "@/components/OFFilters";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface LineaStats {
   id: string;
@@ -40,6 +42,8 @@ const DashboardProduccion = () => {
   const [isCreateOFModalOpen, setIsCreateOFModalOpen] = useState(false);
   const [users, setUsers] = useState<UserData[]>([]);
   const [filters, setFilters] = useState<OFFiltersType>({});
+  const [recentOFs, setRecentOFs] = useState<any[]>([]);
+  const [priorityAlerts, setPriorityAlerts] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -107,13 +111,37 @@ const DashboardProduccion = () => {
             .eq("line_id", line.id)
             .in("status", ["pendiente", "en_proceso"]);
 
+          // Calcular tiempo promedio real de OFs completadas en últimos 30 días
+          const { data: completedOFs } = await supabase
+            .from("fabrication_orders")
+            .select("started_at, completed_at")
+            .eq("line_id", line.id)
+            .eq("status", "completada")
+            .not("started_at", "is", null)
+            .not("completed_at", "is", null)
+            .gte("completed_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+
+          let tiempo_promedio = "N/A";
+          if (completedOFs && completedOFs.length > 0) {
+            const totalMinutes = completedOFs.reduce((sum, of) => {
+              const start = new Date(of.started_at).getTime();
+              const end = new Date(of.completed_at).getTime();
+              return sum + ((end - start) / (1000 * 60));
+            }, 0);
+            
+            const avgMinutes = Math.round(totalMinutes / completedOFs.length);
+            const hours = Math.floor(avgMinutes / 60);
+            const minutes = avgMinutes % 60;
+            tiempo_promedio = `${hours}h ${minutes}m`;
+          }
+
           return {
             id: line.id,
             name: line.name,
             status: line.status,
             ofs_activas: count || 0,
             capacity: line.capacity,
-            tiempo_promedio: "2h 15m", // TODO: Calculate from real data
+            tiempo_promedio,
             ultima_actualizacion: new Date(line.updated_at).toLocaleString("es-ES"),
           };
         })
@@ -148,6 +176,44 @@ const DashboardProduccion = () => {
         .is("resolved_at", null);
 
       setAlertas(alertsCount || 0);
+
+      // Fetch recent OFs (últimas 10)
+      const { data: recentOFsData, error: ofsError } = await supabase
+        .from("fabrication_orders")
+        .select(`
+          id,
+          sap_id,
+          customer,
+          status,
+          priority,
+          created_at,
+          line_id,
+          production_lines (name)
+        `)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (ofsError) throw ofsError;
+      setRecentOFs(recentOFsData || []);
+
+      // Fetch alertas prioritarias (no resueltas, ordenadas por severity)
+      const { data: priorityAlertsData, error: alertsError } = await supabase
+        .from("alerts")
+        .select(`
+          id,
+          message,
+          severity,
+          type,
+          created_at,
+          related_of_id
+        `)
+        .is("resolved_at", null)
+        .order("severity", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (alertsError) throw alertsError;
+      setPriorityAlerts(priorityAlertsData || []);
 
       setLoading(false);
     } catch (error) {
@@ -220,6 +286,29 @@ const DashboardProduccion = () => {
         return "Estado desconocido";
     }
   };
+
+  const getSeverityIcon = (severity: string) => {
+    switch (severity) {
+      case "critical":
+        return "🔴";
+      case "warning":
+        return "🟠";
+      case "info":
+        return "🟡";
+      default:
+        return "⚪";
+    }
+  };
+
+  const produccionData = [
+    { dia: 'L', completadas: 12, pendientes: 5 },
+    { dia: 'M', completadas: 15, pendientes: 3 },
+    { dia: 'X', completadas: 10, pendientes: 7 },
+    { dia: 'J', completadas: 18, pendientes: 2 },
+    { dia: 'V', completadas: 14, pendientes: 4 },
+    { dia: 'S', completadas: 8, pendientes: 6 },
+    { dia: 'Hoy', completadas: completadasHoy, pendientes: totalOFs }
+  ];
 
   if (loading) {
     return (
