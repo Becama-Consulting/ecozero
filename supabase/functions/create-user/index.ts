@@ -1,5 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.81.1';
-import { corsHeaders } from '../_shared/cors.ts';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -7,7 +11,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
@@ -29,20 +32,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create admin client with service role key
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
+      auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    // Create regular client for auth verification
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } }
     });
 
-    // Verify the requesting user is authenticated
     const { data: { user: requestingUser }, error: authError } = await supabaseClient.auth.getUser();
     
     if (authError || !requestingUser) {
@@ -55,14 +52,13 @@ Deno.serve(async (req) => {
 
     console.log('Authenticated user:', requestingUser.id, requestingUser.email);
 
-    // Get requesting user's roles using service role to bypass RLS
     const { data: requestingUserRoles, error: rolesError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
       .eq('user_id', requestingUser.id);
 
     if (rolesError) {
-      console.error('Error fetching roles:', rolesError.message, rolesError.details);
+      console.error('Error fetching roles:', rolesError.message);
       return new Response(
         JSON.stringify({ error: 'Error al verificar permisos del usuario' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -71,20 +67,15 @@ Deno.serve(async (req) => {
 
     console.log('Requesting user roles:', requestingUserRoles);
 
-    // Get requesting user's department
-    const { data: requestingUserProfile, error: profileError } = await supabaseAdmin
+    const { data: requestingUserProfile } = await supabaseAdmin
       .from('profiles')
       .select('departamento')
       .eq('id', requestingUser.id)
       .single();
 
-    if (profileError) {
-      console.error('Error fetching profile:', profileError.message);
-    }
-
-    const isAdminGlobal = requestingUserRoles?.some(r => r.role === 'admin_global');
-    const isAdminDepartamento = requestingUserRoles?.some(r => r.role === 'admin_departamento');
-    const isSupervisor = requestingUserRoles?.some(r => r.role === 'supervisor');
+    const isAdminGlobal = requestingUserRoles?.some((r: any) => r.role === 'admin_global');
+    const isAdminDepartamento = requestingUserRoles?.some((r: any) => r.role === 'admin_departamento');
+    const isSupervisor = requestingUserRoles?.some((r: any) => r.role === 'supervisor');
 
     if (!isAdminGlobal && !isAdminDepartamento && !isSupervisor) {
       return new Response(
@@ -93,7 +84,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Parse and validate request body
     let email, password, name, departamento, role;
     
     try {
@@ -104,31 +94,19 @@ Deno.serve(async (req) => {
       departamento = body.departamento;
       role = body.role;
     } catch (parseError) {
-      console.error('Error parsing request body:', parseError);
       return new Response(
         JSON.stringify({ error: 'Formato de datos inválido' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate required fields
     if (!email || !password || !name || !role) {
-      console.error('Missing required fields:', { email: !!email, password: !!password, name: !!name, role: !!role });
       return new Response(
-        JSON.stringify({ 
-          error: 'Faltan campos requeridos',
-          missing: {
-            email: !email,
-            password: !password,
-            name: !name,
-            role: !role
-          }
-        }),
+        JSON.stringify({ error: 'Faltan campos requeridos' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return new Response(
@@ -137,172 +115,92 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate role is valid
     const validRoles = ['admin_global', 'admin_departamento', 'supervisor', 'operario', 'quality'];
     if (!validRoles.includes(role)) {
       return new Response(
-        JSON.stringify({ error: `Rol inválido. Debe ser uno de: ${validRoles.join(', ')}` }),
+        JSON.stringify({ error: 'Rol inválido' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Verify permissions based on role hierarchy
     if (isSupervisor && !isAdminGlobal && !isAdminDepartamento) {
-      // Supervisors can only create operarios in their department
-      if (role !== 'operario') {
+      if (role !== 'operario' || departamento !== requestingUserProfile?.departamento) {
         return new Response(
-          JSON.stringify({ error: 'Los supervisores solo pueden crear operarios' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (departamento !== requestingUserProfile?.departamento) {
-        return new Response(
-          JSON.stringify({ error: 'Solo puedes crear usuarios en tu departamento' }),
+          JSON.stringify({ error: 'Los supervisores solo pueden crear operarios en su departamento' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }
 
     if (isAdminDepartamento && !isAdminGlobal) {
-      // Admin departamento can create in their department but not other admins
-      if (departamento !== requestingUserProfile?.departamento) {
+      if (departamento !== requestingUserProfile?.departamento || ['admin_global', 'admin_departamento'].includes(role)) {
         return new Response(
-          JSON.stringify({ error: 'Solo puedes crear usuarios en tu departamento' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (role === 'admin_global' || role === 'admin_departamento') {
-        return new Response(
-          JSON.stringify({ error: 'No puedes crear otros administradores' }),
+          JSON.stringify({ error: 'No tienes permisos para esta acción' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }
 
-    // Check if email already exists
-    const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    
-    if (listError) {
-      console.error('Error listing users:', listError.message);
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    if (existingUsers?.users?.some((u: any) => u.email?.toLowerCase() === email.toLowerCase())) {
       return new Response(
-        JSON.stringify({ error: 'Error al verificar email existente' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const emailExists = existingUsers?.users?.some(u => u.email?.toLowerCase() === email.toLowerCase());
-
-    if (emailExists) {
-      console.warn('Email already exists:', email);
-      return new Response(
-        JSON.stringify({ error: 'Este email ya está registrado en el sistema' }),
+        JSON.stringify({ error: 'Este email ya está registrado' }),
         { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Creating user with data:', { email, name, departamento, role });
+    console.log('Creating user:', { email, name, departamento, role });
 
-    // Create user in Supabase Auth
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Auto-confirm email
+      email_confirm: true,
       user_metadata: { name }
     });
 
-    if (createError) {
-      console.error('Error creating auth user:', {
-        message: createError.message,
-        status: createError.status,
-        name: createError.name
-      });
+    if (createError || !newUser?.user) {
+      console.error('Error creating user:', createError);
       return new Response(
-        JSON.stringify({ 
-          error: `Error al crear usuario en el sistema de autenticación: ${createError.message}`,
-          details: createError.status 
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!newUser?.user) {
-      console.error('User creation succeeded but no user object returned');
-      return new Response(
-        JSON.stringify({ error: 'Error inesperado: usuario no retornado por el sistema' }),
+        JSON.stringify({ error: `Error al crear usuario: ${createError?.message}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const userId = newUser.user.id;
-    console.log('✓ Auth user created successfully:', userId);
+    console.log('✓ Auth user created:', userId);
 
-    // Create profile (using service role to bypass RLS)
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .insert({
-        id: userId,
-        email,
-        name,
-        departamento: departamento || null
-      });
+      .insert({ id: userId, email, name, departamento: departamento || null });
 
     if (profileError) {
-      console.error('Error creating profile:', {
-        message: profileError.message,
-        details: profileError.details,
-        hint: profileError.hint,
-        code: profileError.code
-      });
-      
-      // Rollback: delete the auth user
-      console.log('Rolling back: deleting auth user', userId);
+      console.error('Error creating profile:', profileError);
       await supabaseAdmin.auth.admin.deleteUser(userId);
-      
       return new Response(
-        JSON.stringify({ 
-          error: `Error al crear perfil de usuario: ${profileError.message}`,
-          details: profileError.details
-        }),
+        JSON.stringify({ error: `Error al crear perfil: ${profileError.message}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('✓ Profile created successfully for user:', userId);
+    console.log('✓ Profile created');
 
-    // Assign role (using service role to bypass RLS)
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
-      .insert({
-        user_id: userId,
-        role
-      });
+      .insert({ user_id: userId, role });
 
     if (roleError) {
-      console.error('Error assigning role:', {
-        message: roleError.message,
-        details: roleError.details,
-        hint: roleError.hint,
-        code: roleError.code
-      });
-      
-      // Rollback: delete profile and auth user
-      console.log('Rolling back: deleting profile and auth user', userId);
+      console.error('Error assigning role:', roleError);
       await supabaseAdmin.from('profiles').delete().eq('id', userId);
       await supabaseAdmin.auth.admin.deleteUser(userId);
-      
       return new Response(
-        JSON.stringify({ 
-          error: `Error al asignar rol: ${roleError.message}`,
-          details: roleError.details
-        }),
+        JSON.stringify({ error: `Error al asignar rol: ${roleError.message}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('✓ Role assigned successfully to user:', userId, '-', role);
+    console.log('✓ Role assigned');
 
-    // Log activity
-    const { error: logError } = await supabaseAdmin.from('activity_log').insert({
+    await supabaseAdmin.from('activity_log').insert({
       user_id: requestingUser.id,
       action: 'create_user',
       table_name: 'profiles',
@@ -310,40 +208,21 @@ Deno.serve(async (req) => {
       new_values: { email, name, departamento, role }
     });
 
-    if (logError) {
-      console.warn('Failed to log activity (non-critical):', logError.message);
-    }
-
-    console.log('✓✓✓ User creation completed successfully ✓✓✓');
+    console.log('✓✓✓ User created successfully');
 
     return new Response(
       JSON.stringify({
         success: true,
-        user: {
-          id: userId,
-          email,
-          name,
-          departamento: departamento || null,
-          role
-        },
+        user: { id: userId, email, name, departamento: departamento || null, role },
         message: 'Usuario creado exitosamente'
       }),
       { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('=== UNEXPECTED ERROR ===');
-    console.error('Type:', error?.constructor?.name);
-    console.error('Message:', error?.message);
-    console.error('Stack:', error?.stack);
-    console.error('Full error:', JSON.stringify(error, null, 2));
-    
+    console.error('Unexpected error:', error);
     return new Response(
-      JSON.stringify({ 
-        error: 'Error inesperado al crear usuario',
-        message: error instanceof Error ? error.message : 'Error desconocido',
-        type: error?.constructor?.name
-      }),
+      JSON.stringify({ error: 'Error inesperado al crear usuario' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

@@ -193,7 +193,7 @@ const AdminUsers = () => {
         role: selectedRoles[0]
       });
 
-      const { data, error } = await supabase.functions.invoke('smart-responder', {
+      const { data, error } = await supabase.functions.invoke('create-user', {
         body: {
           email: newEmail,
           password,
@@ -263,10 +263,10 @@ const AdminUsers = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No hay sesión activa');
 
-      console.log('Calling super-task Edge Function for:', userId);
+      console.log('Calling delete-user Edge Function for:', userId);
 
       // Call Edge Function to delete user completely
-      const { data, error } = await supabase.functions.invoke('super-task', {
+      const { data, error } = await supabase.functions.invoke('delete-user', {
         body: { userId }
       });
 
