@@ -52,10 +52,10 @@ export const GenerateCredentialsModal = ({ open, onOpenChange, users }: Generate
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No hay sesión activa');
 
-      console.log('Calling regenerate-password Edge Function for:', selectedUser.id);
+      console.log('Calling clever-action Edge Function for:', selectedUser.id);
 
       // Call Edge Function to regenerate password
-      const { data, error } = await supabase.functions.invoke('regenerate-password', {
+      const { data, error } = await supabase.functions.invoke('clever-action', {
         body: { userId: selectedUser.id }
       });
 
