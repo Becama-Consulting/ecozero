@@ -13,7 +13,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Trash2, ArrowLeft, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { GenerateCredentialsModal } from "@/components/GenerateCredentialsModal";
 import { UserCredentialsModal } from "@/components/UserCredentialsModal";
 
 interface UserData {
@@ -34,13 +33,18 @@ const AdminUsers = () => {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<UserData[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
   
   // Form state
   const [newEmail, setNewEmail] = useState("");
   const [newName, setNewName] = useState("");
   const [newDepartamento, setNewDepartamento] = useState<string>("");
   const [selectedRoles, setSelectedRoles] = useState<AppRole[]>([]);
+  
+  // Credentials modal state
+  const [generatedPassword, setGeneratedPassword] = useState("");
+  const [showCredentials, setShowCredentials] = useState(false);
+  const [createdUserEmail, setCreatedUserEmail] = useState("");
+  const [createdUserName, setCreatedUserName] = useState("");
 
   // Verify admin access
   useEffect(() => {
@@ -131,38 +135,34 @@ const AdminUsers = () => {
 
     setLoading(true);
     try {
-      // Step 1: Create user in Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newEmail,
-        password: Math.random().toString(36).slice(-12), // Random password
-        options: {
-          data: { name: newName },
+      // Generate secure random password
+      const password = Array.from({ length: 12 }, () => 
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*'
+          .charAt(Math.floor(Math.random() * 68))
+      ).join('');
+
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No hay sesión activa');
+
+      // Call Edge Function to create user
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: newEmail,
+          password,
+          name: newName,
+          departamento: newDepartamento || null,
+          role: selectedRoles[0], // Primary role
         },
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("No user returned from signup");
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || 'Error al crear usuario');
 
-      // Step 2: Update profile with department
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ 
-          departamento: newDepartamento 
-            ? newDepartamento as "produccion" | "logistica" | "compras" | "rrhh" | "comercial" | "administrativo"
-            : null 
-        })
-        .eq("id", authData.user.id);
-
-      if (profileError) throw profileError;
-
-      // Step 3: Assign roles
-      for (const role of selectedRoles) {
-        const { error: roleError } = await supabase
-          .from("user_roles")
-          .insert({ user_id: authData.user.id, role });
-
-        if (roleError) throw roleError;
-      }
+      // Store credentials to show modal
+      setGeneratedPassword(password);
+      setCreatedUserEmail(newEmail);
+      setCreatedUserName(newName);
 
       toast({
         title: "Usuario creado",
@@ -175,6 +175,9 @@ const AdminUsers = () => {
       setNewDepartamento("");
       setSelectedRoles([]);
       setIsDialogOpen(false);
+
+      // Show credentials modal
+      setShowCredentials(true);
 
       // Reload users
       loadUsers();
@@ -482,6 +485,15 @@ const AdminUsers = () => {
           </CardContent>
         </Card>
       </main>
+
+      {/* Credentials Modal */}
+      <UserCredentialsModal
+        open={showCredentials}
+        onOpenChange={setShowCredentials}
+        email={createdUserEmail}
+        password={generatedPassword}
+        userName={createdUserName}
+      />
     </div>
   );
 };
