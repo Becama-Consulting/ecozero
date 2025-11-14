@@ -259,25 +259,22 @@ const AdminUsers = () => {
 
     setLoading(true);
     try {
-      // Delete roles
-      const { error: rolesError } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", userId);
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { userId }
+      });
 
-      if (rolesError) throw rolesError;
+      if (error) {
+        throw new Error(`Error al invocar función: ${error.message}`);
+      }
 
-      // Delete profile
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .delete()
-        .eq("id", userId);
-
-      if (profileError) throw profileError;
+      if (!data || !data.success) {
+        const errorMsg = data?.error || 'Error desconocido al eliminar usuario';
+        throw new Error(errorMsg);
+      }
 
       toast({
         title: "Usuario eliminado",
-        description: `${userName} ha sido eliminado`,
+        description: `${userName} ha sido eliminado correctamente`,
       });
 
       loadUsers();
@@ -286,7 +283,7 @@ const AdminUsers = () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "No se pudo eliminar el usuario",
+        description: error instanceof Error ? error.message : "No se pudo eliminar el usuario",
       });
     } finally {
       setLoading(false);

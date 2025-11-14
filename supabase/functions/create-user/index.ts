@@ -153,27 +153,27 @@ Deno.serve(async (req) => {
 
     console.log('User created in auth:', newUser.user.id);
 
-    // Create profile
+    // Update profile (trigger already created it)
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .insert({
-        id: newUser.user.id,
+      .update({
         email,
         name,
         departamento: departamento || null
-      });
+      })
+      .eq('id', newUser.user.id);
 
     if (profileError) {
-      console.error('Error creating profile:', profileError);
+      console.error('Error updating profile:', profileError);
       // Rollback: delete the auth user
       await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
       return new Response(
-        JSON.stringify({ error: `Error al crear perfil: ${profileError.message}` }),
+        JSON.stringify({ error: `Error al actualizar perfil: ${profileError.message}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Profile created for user:', newUser.user.id);
+    console.log('Profile updated for user:', newUser.user.id);
 
     // Assign role
     const { error: roleError } = await supabaseAdmin

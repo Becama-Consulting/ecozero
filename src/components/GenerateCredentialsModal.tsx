@@ -50,22 +50,22 @@ export const GenerateCredentialsModal = ({ open, onOpenChange, users }: Generate
     try {
       const newPassword = generateRandomPassword();
       
-      // Update password via Supabase Admin API
-      const { error } = await supabase.auth.admin.updateUserById(
-        selectedUser.id,
-        { password: newPassword }
-      );
-
-      if (error) throw error;
-
-      // Log activity
-      await supabase.from("activity_log").insert({
-        user_id: selectedUser.id,
-        action: "generate_credentials",
-        table_name: "auth.users",
-        record_id: selectedUser.id,
-        new_values: { password_generated: true, timestamp: new Date().toISOString() }
+      // Call edge function to regenerate password
+      const { data, error } = await supabase.functions.invoke('regenerate-password', {
+        body: {
+          userId: selectedUser.id,
+          password: newPassword
+        }
       });
+
+      if (error) {
+        throw new Error(`Error al invocar función: ${error.message}`);
+      }
+
+      if (!data || !data.success) {
+        const errorMsg = data?.error || 'Error desconocido al regenerar contraseña';
+        throw new Error(errorMsg);
+      }
 
       setGeneratedPassword(newPassword);
       toast({
