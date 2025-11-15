@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
       .select('role')
       .eq('user_id', requestingUser.id);
 
-    const isAdminGlobal = requestingUserRoles?.some((r: any) => r.role === 'admin_global');
+    const isAdminGlobal = requestingUserRoles?.some(r => r.role === 'admin_global');
 
     if (!isAdminGlobal) {
       return new Response(

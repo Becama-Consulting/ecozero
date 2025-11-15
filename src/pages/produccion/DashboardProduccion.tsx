@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, AlertTriangle, Plus, Map, Key } from "lucide-react";
 import { toast } from "sonner";
-import { GenerateCredentialsModal } from "@/components/GenerateCredentialsModal";
-import { CreateOFModal } from "@/components/CreateOFModal";
-import { OFFilters, type OFFilters as OFFiltersType } from "@/components/OFFilters";
+import { GenerateCredentialsModal } from "@/components/admin/GenerateCredentialsModal";
+import { CreateOFModal } from "@/components/produccion/CreateOFModal";
+import { OFFilters, type OFFilters as OFFiltersType } from "@/components/produccion/OFFilters";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface LineaStats {

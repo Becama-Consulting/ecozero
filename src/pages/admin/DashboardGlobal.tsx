@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Zap, Users, Settings, FileText, LogOut, Shield, Activity, Key } from "lucide-react";
-import { GenerateCredentialsModal } from "@/components/GenerateCredentialsModal";
+import { GenerateCredentialsModal } from "@/components/admin/GenerateCredentialsModal";
 
 interface UserData {
   id: string;

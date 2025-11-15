@@ -13,8 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Trash2, ArrowLeft, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { GenerateCredentialsModal } from "@/components/GenerateCredentialsModal";
-import { UserCredentialsModal } from "@/components/UserCredentialsModal";
+import { GenerateCredentialsModal } from "@/components/admin/GenerateCredentialsModal";
+import { UserCredentialsModal } from "@/components/admin/UserCredentialsModal";
 
 interface UserData {
   id: string;
