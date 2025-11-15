@@ -16,41 +16,62 @@ export type Database = {
     Tables: {
       absences: {
         Row: {
+          absence_type: string | null
+          ai_validated_at: string | null
           approved_at: string | null
           approved_by: string | null
           created_at: string | null
+          document_ai_check: Json | null
+          document_url: string | null
+          document_validated: boolean | null
           employee_id: string
           end_date: string
           id: string
           reason: string | null
+          rejection_reason: string | null
           start_date: string
           status: string | null
+          total_days: number | null
           type: string
           updated_at: string | null
         }
         Insert: {
+          absence_type?: string | null
+          ai_validated_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
           created_at?: string | null
+          document_ai_check?: Json | null
+          document_url?: string | null
+          document_validated?: boolean | null
           employee_id: string
           end_date: string
           id?: string
           reason?: string | null
+          rejection_reason?: string | null
           start_date: string
           status?: string | null
+          total_days?: number | null
           type: string
           updated_at?: string | null
         }
         Update: {
+          absence_type?: string | null
+          ai_validated_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
           created_at?: string | null
+          document_ai_check?: Json | null
+          document_url?: string | null
+          document_validated?: boolean | null
           employee_id?: string
           end_date?: string
           id?: string
           reason?: string | null
+          rejection_reason?: string | null
           start_date?: string
           status?: string | null
+          total_days?: number | null
           type?: string
           updated_at?: string | null
         }
@@ -332,6 +353,77 @@ export type Database = {
             columns: ["line_id"]
             isOneToOne: false
             referencedRelation: "production_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll: {
+        Row: {
+          advisor_data: Json | null
+          base_salary: number | null
+          bonuses: number | null
+          created_at: string | null
+          deductions: number | null
+          discrepancies: Json | null
+          employee_id: string
+          extras: number | null
+          gross_salary: number | null
+          has_discrepancies: boolean | null
+          id: string
+          internal_data: Json | null
+          net_salary: number | null
+          period: string
+          status: string | null
+          updated_at: string | null
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          advisor_data?: Json | null
+          base_salary?: number | null
+          bonuses?: number | null
+          created_at?: string | null
+          deductions?: number | null
+          discrepancies?: Json | null
+          employee_id: string
+          extras?: number | null
+          gross_salary?: number | null
+          has_discrepancies?: boolean | null
+          id?: string
+          internal_data?: Json | null
+          net_salary?: number | null
+          period: string
+          status?: string | null
+          updated_at?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          advisor_data?: Json | null
+          base_salary?: number | null
+          bonuses?: number | null
+          created_at?: string | null
+          deductions?: number | null
+          discrepancies?: Json | null
+          employee_id?: string
+          extras?: number | null
+          gross_salary?: number | null
+          has_discrepancies?: boolean | null
+          id?: string
+          internal_data?: Json | null
+          net_salary?: number | null
+          period?: string
+          status?: string | null
+          updated_at?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
             referencedColumns: ["id"]
           },
         ]
