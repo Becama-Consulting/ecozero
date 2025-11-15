@@ -16,5 +16,12 @@
     "strictNullChecks": false,
     "esModuleInterop": true,
     "moduleDetection": "force"
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "supabase/functions",
+    "prompts",
+    ".vscode"
+  ]
 }
