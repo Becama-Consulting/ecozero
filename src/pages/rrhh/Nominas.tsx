@@ -23,7 +23,7 @@ type Nomina = {
   net_salary: number;
   status: string;
   has_discrepancies: boolean;
-  discrepancies: any[];
+  discrepancies: any;
   employees: {
     employee_code: string;
     full_name: string;
