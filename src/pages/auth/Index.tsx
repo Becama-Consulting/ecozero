@@ -192,7 +192,7 @@ const Index = () => {
           </Card>
 
           {/* RRHH Module */}
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-l-4 border-l-warning opacity-50">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-l-4 border-l-warning">
             <CardHeader>
               <div className="flex items-center space-x-3 mb-2">
                 <div className="status-warning rounded-lg p-2">
@@ -205,8 +205,11 @@ const Index = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="w-full" variant="outline" disabled>
-                Próximamente
+              <Button 
+                onClick={() => navigate("/rrhh")}
+                className="w-full status-warning hover:bg-warning/90 touch-target"
+              >
+                Acceder →
               </Button>
             </CardContent>
           </Card>
