@@ -206,39 +206,57 @@ export type Database = {
       employee_documents: {
         Row: {
           created_at: string | null
+          document_name: string | null
           document_type: string
           employee_id: string
           expiry_date: string | null
+          file_size: number | null
+          file_type: string | null
           file_url: string
           id: string
+          issue_date: string | null
           required: boolean | null
+          status: string | null
           updated_at: string | null
+          uploaded_by: string | null
           verified: boolean | null
           verified_at: string | null
           verified_by: string | null
         }
         Insert: {
           created_at?: string | null
+          document_name?: string | null
           document_type: string
           employee_id: string
           expiry_date?: string | null
+          file_size?: number | null
+          file_type?: string | null
           file_url: string
           id?: string
+          issue_date?: string | null
           required?: boolean | null
+          status?: string | null
           updated_at?: string | null
+          uploaded_by?: string | null
           verified?: boolean | null
           verified_at?: string | null
           verified_by?: string | null
         }
         Update: {
           created_at?: string | null
+          document_name?: string | null
           document_type?: string
           employee_id?: string
           expiry_date?: string | null
+          file_size?: number | null
+          file_type?: string | null
           file_url?: string
           id?: string
+          issue_date?: string | null
           required?: boolean | null
+          status?: string | null
           updated_at?: string | null
+          uploaded_by?: string | null
           verified?: boolean | null
           verified_at?: string | null
           verified_by?: string | null
@@ -301,6 +319,107 @@ export type Database = {
           position?: string
           termination_date?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      ett_employees: {
+        Row: {
+          active: boolean | null
+          agency: string
+          contract_end: string | null
+          contract_start: string
+          created_at: string | null
+          employee_id: string
+          hourly_rate: number
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          agency: string
+          contract_end?: string | null
+          contract_start: string
+          created_at?: string | null
+          employee_id: string
+          hourly_rate: number
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          agency?: string
+          contract_end?: string | null
+          contract_start?: string
+          created_at?: string | null
+          employee_id?: string
+          hourly_rate?: number
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ett_employees_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ett_invoices: {
+        Row: {
+          agency: string
+          created_at: string | null
+          discrepancies: Json | null
+          extracted_data: Json | null
+          file_size: number | null
+          file_url: string
+          id: string
+          invoice_date: string
+          invoice_number: string
+          period_end: string
+          period_start: string
+          total_amount: number
+          updated_at: string | null
+          validated: boolean | null
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          agency: string
+          created_at?: string | null
+          discrepancies?: Json | null
+          extracted_data?: Json | null
+          file_size?: number | null
+          file_url: string
+          id?: string
+          invoice_date: string
+          invoice_number: string
+          period_end: string
+          period_start: string
+          total_amount: number
+          updated_at?: string | null
+          validated?: boolean | null
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          agency?: string
+          created_at?: string | null
+          discrepancies?: Json | null
+          extracted_data?: Json | null
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          period_end?: string
+          period_start?: string
+          total_amount?: number
+          updated_at?: string | null
+          validated?: boolean | null
+          validated_at?: string | null
+          validated_by?: string | null
         }
         Relationships: []
       }

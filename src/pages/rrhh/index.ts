@@ -4,3 +4,5 @@ export { Fichajes } from './Fichajes';
 export { Turnos } from './Turnos';
 export { Ausencias } from './Ausencias';
 export { Nominas } from './Nominas';
+export { Documentacion } from './Documentacion';
+export { EmpleadosETT } from './EmpleadosETT';
