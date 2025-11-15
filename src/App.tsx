@@ -11,6 +11,7 @@ import DashboardProduccion from "./pages/produccion/DashboardProduccion";
 import DetalleLinea from "./pages/produccion/DetalleLinea";
 import FichaOF from "./pages/produccion/FichaOF";
 import Alertas from "./pages/produccion/Alertas";
+import { DashboardRRHH, Empleados } from "./pages/rrhh";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
@@ -69,6 +70,22 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Alertas />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rrhh"
+            element={
+              <ProtectedRoute>
+                <DashboardRRHH />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rrhh/empleados"
+            element={
+              <ProtectedRoute>
+                <Empleados />
               </ProtectedRoute>
             }
           />
