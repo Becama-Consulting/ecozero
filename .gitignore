@@ -12,8 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Environment variables - TEMPORARY: .env allowed for Lovable
+# .env
 # Environment variables - NEVER COMMIT
-.env
 .env.local
 .env.production
 .env.development
