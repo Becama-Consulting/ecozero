@@ -12,6 +12,7 @@ interface CreateOFModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialLineId?: string;
 }
 
 interface ProductionLine {
@@ -19,7 +20,7 @@ interface ProductionLine {
   name: string;
 }
 
-export const CreateOFModal = ({ isOpen, onClose, onSuccess }: CreateOFModalProps) => {
+export const CreateOFModal = ({ isOpen, onClose, onSuccess, initialLineId }: CreateOFModalProps) => {
   const { user } = useAuth();
   const [customer, setCustomer] = useState('');
   const [lineId, setLineId] = useState('');
@@ -31,8 +32,11 @@ export const CreateOFModal = ({ isOpen, onClose, onSuccess }: CreateOFModalProps
   useEffect(() => {
     if (isOpen) {
       fetchLines();
+      if (initialLineId) {
+        setLineId(initialLineId);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialLineId]);
 
   const fetchLines = async () => {
     try {
