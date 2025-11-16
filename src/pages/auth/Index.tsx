@@ -149,7 +149,9 @@ const Index = () => {
           )}
 
           {/* Producción Module */}
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-l-4 border-l-success">
+          <Card className="hover:shadow-lg transition-all duration-300 hover:scale-105 bg-gradient-to-br from-success/5 to-success/10 border-success/20 cursor-pointer border-l-4 border-l-success"
+            onClick={() => navigate("/dashboard/produccion")}>
+
             <CardHeader>
               <div className="flex items-center space-x-3 mb-2">
                 <div className="status-success rounded-lg p-2">
@@ -172,7 +174,7 @@ const Index = () => {
           </Card>
 
           {/* Logística Module */}
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-l-4 border-l-info opacity-50">
+          <Card className="hover:shadow-lg transition-all duration-300 hover:scale-105 bg-gradient-to-br from-info/5 to-info/10 border-info/20 cursor-pointer border-l-4 border-l-info opacity-50">
             <CardHeader>
               <div className="flex items-center space-x-3 mb-2">
                 <div className="status-info rounded-lg p-2">
@@ -192,7 +194,9 @@ const Index = () => {
           </Card>
 
           {/* RRHH Module */}
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-l-4 border-l-warning">
+          <Card className="hover:shadow-lg transition-all duration-300 hover:scale-105 bg-gradient-to-br from-warning/5 to-warning/10 border-warning/20 cursor-pointer border-l-4 border-l-warning"
+            onClick={() => navigate("/dashboard/rrhh")}>
+
             <CardHeader>
               <div className="flex items-center space-x-3 mb-2">
                 <div className="status-warning rounded-lg p-2">
@@ -215,7 +219,7 @@ const Index = () => {
           </Card>
 
           {/* Dashboards Module */}
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-l-4 border-l-secondary opacity-50">
+          <Card className="hover:shadow-lg transition-all duration-300 hover:scale-105 bg-gradient-to-br from-secondary/5 to-secondary/10 border-secondary/20 cursor-pointer border-l-4 border-l-secondary opacity-50">
             <CardHeader>
               <div className="flex items-center space-x-3 mb-2">
                 <div className="bg-secondary text-secondary-foreground rounded-lg p-2">
