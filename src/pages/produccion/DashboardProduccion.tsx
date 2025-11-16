@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useNotifications } from "@/hooks/useNotifications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, AlertTriangle, Plus, Map, Key } from "lucide-react";
+import { Loader2, AlertTriangle, Plus, Map, Key, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateCredentialsModal } from "@/components/admin/GenerateCredentialsModal";
 import { CreateOFModal } from "@/components/produccion/CreateOFModal";
@@ -34,6 +35,7 @@ interface UserData {
 
 const DashboardProduccion = () => {
   const { user, isAdmin, hasRole } = useAuth();
+  const { permission, requestPermission } = useNotifications();
   const navigate = useNavigate();
   const [lineas, setLineas] = useState<LineaStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -362,6 +364,28 @@ const DashboardProduccion = () => {
           </div>
         </div>
 
+        {/* Notificaciones Push */}
+        {permission === 'default' && (
+          <Card className="border-warning">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Bell className="h-5 w-5 text-warning" />
+                  <div>
+                    <h3 className="font-semibold">Activar Notificaciones</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Recibe alertas críticas en tiempo real
+                    </p>
+                  </div>
+                </div>
+                <Button onClick={requestPermission} variant="default">
+                  Activar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Métricas Globales */}
         <Card>
           <CardHeader>
@@ -375,7 +399,7 @@ const DashboardProduccion = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Líneas OK</p>
-                <p className="text-2xl font-bold text-success">
+                <p className="text-2xl font-bold text-green-600">
                   {lineas.filter((l) => l.status === "active").length}/{lineas.length}
                 </p>
               </div>
