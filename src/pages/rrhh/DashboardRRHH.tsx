@@ -320,6 +320,5 @@ export const DashboardRRHH = () => {
         </Card>
       </div>
     </div>
-    </div>
   );
 };
