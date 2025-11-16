@@ -206,7 +206,7 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <Button 
-                onClick={() => navigate("/dashboard/rrhh")}
+                onClick={() => navigate("/rrhh")}
                 className="w-full status-warning hover:bg-warning/90 touch-target"
               >
                 Acceder →

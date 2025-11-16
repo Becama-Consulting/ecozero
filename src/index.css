@@ -1,6 +1,3 @@
-/* Google Fonts Import - MUST BE FIRST */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -239,3 +236,6 @@
     @apply fixed top-0 left-0 right-0 z-50 bg-warning text-warning-foreground text-center py-2 text-sm font-medium;
   }
 }
+
+/* Google Fonts Import */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');

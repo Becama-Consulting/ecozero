@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/auth/Index.tsx";
+import Index from "./pages/auth/Index";
 import Auth from "./pages/auth/Auth";
 import AdminUsers from "./pages/admin/AdminUsers";
 import DashboardGlobal from "./pages/admin/DashboardGlobal";
@@ -74,7 +74,7 @@ const App = () => (
             }
           />
           <Route
-            path="/dashboard/rrhh"
+            path="/rrhh"
             element={
               <ProtectedRoute>
                 <DashboardRRHH />
@@ -82,7 +82,7 @@ const App = () => (
             }
           />
           <Route
-            path="/dashboard/rrhh/empleados"
+            path="/rrhh/empleados"
             element={
               <ProtectedRoute>
                 <Empleados />
@@ -90,7 +90,7 @@ const App = () => (
             }
           />
           <Route
-            path="/dashboard/rrhh/fichajes"
+            path="/rrhh/fichajes"
             element={
               <ProtectedRoute>
                 <Fichajes />
@@ -98,7 +98,7 @@ const App = () => (
             }
           />
           <Route
-            path="/dashboard/rrhh/turnos"
+            path="/rrhh/turnos"
             element={
               <ProtectedRoute>
                 <Turnos />
@@ -106,7 +106,7 @@ const App = () => (
             }
           />
           <Route
-            path="/dashboard/rrhh/ausencias"
+            path="/rrhh/ausencias"
             element={
               <ProtectedRoute>
                 <Ausencias />
@@ -114,7 +114,7 @@ const App = () => (
             }
           />
           <Route
-            path="/dashboard/rrhh/nominas"
+            path="/rrhh/nominas"
             element={
               <ProtectedRoute>
                 <Nominas />
@@ -122,7 +122,7 @@ const App = () => (
             }
           />
           <Route
-            path="/dashboard/rrhh/documentacion"
+            path="/rrhh/documentacion"
             element={
               <ProtectedRoute>
                 <Documentacion />
@@ -130,7 +130,7 @@ const App = () => (
             }
           />
           <Route
-            path="/dashboard/rrhh/empleados-ett"
+            path="/rrhh/empleados-ett"
             element={
               <ProtectedRoute>
                 <EmpleadosETT />
