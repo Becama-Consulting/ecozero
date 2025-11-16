@@ -1,15 +1,17 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Zap, LogOut, Factory, Package, Users, BarChart3, Settings } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const Index = () => {
   const { user, signOut, userRoles, isAdmin, getDashboardByRole, loading } = useAuth();
   const navigate = useNavigate();
   const hasRedirected = useRef(false);
   const isRedirecting = useRef(false);
+  const [showAdminDialog, setShowAdminDialog] = useState(false);
 
   useEffect(() => {
     const handleRedirect = async () => {
@@ -84,7 +86,7 @@ const Index = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate("/dashboard/global")}
+                onClick={() => setShowAdminDialog(true)}
                 className="touch-target"
               >
                 <Settings className="w-4 h-4 mr-2" />
@@ -117,36 +119,6 @@ const Index = () => {
 
         {/* Module Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Admin Panel Module - Only for admin_global */}
-          {userRoles.some((r) => r.role === "admin_global") && (
-            <Card 
-              className="hover:shadow-lg transition-all duration-300 hover:scale-105 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 cursor-pointer"
-              onClick={() => navigate('/admin/users')}
-            >
-              <CardHeader>
-                <div className="flex items-center space-x-3 mb-2">
-                  <div className="bg-primary text-primary-foreground rounded-lg p-2">
-                    <Users className="w-6 h-6" />
-                  </div>
-                  <CardTitle>Admin Panel</CardTitle>
-                </div>
-                <CardDescription>
-                  Gestión de usuarios, roles y permisos del sistema
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate('/admin/users');
-                  }}
-                  className="w-full bg-primary hover:bg-primary/90 touch-target"
-                >
-                  Acceder →
-                </Button>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Producción Module */}
           <Card className="hover:shadow-lg transition-all duration-300 hover:scale-105 bg-gradient-to-br from-success/5 to-success/10 border-success/20 cursor-pointer border-l-4 border-l-success"
@@ -269,6 +241,44 @@ const Index = () => {
           </CardContent>
         </Card>
       </main>
+
+      {/* Admin Dialog */}
+      <Dialog open={showAdminDialog} onOpenChange={setShowAdminDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="bg-primary text-primary-foreground rounded-lg p-2">
+                <Users className="w-5 h-5" />
+              </div>
+              Admin Panel
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Gestión de usuarios, roles y permisos del sistema
+            </p>
+            <Button 
+              onClick={() => {
+                setShowAdminDialog(false);
+                navigate('/admin/users');
+              }}
+              className="w-full bg-primary hover:bg-primary/90"
+            >
+              Acceder a Gestión de Usuarios →
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowAdminDialog(false);
+                navigate('/dashboard/global');
+              }}
+              variant="outline"
+              className="w-full"
+            >
+              Ver Dashboard Global
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
