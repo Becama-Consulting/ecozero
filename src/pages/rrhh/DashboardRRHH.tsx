@@ -126,7 +126,7 @@ export const DashboardRRHH = () => {
           value={`${metrics.empleadosPresentes}/${metrics.empleadosTotales}`}
           icon={Users}
           color="green"
-          onClick={() => navigate('/rrhh/fichajes')}
+          onClick={() => navigate('/dashboard/rrhh/fichajes')}
         />
         
         <MetricCard
@@ -134,7 +134,7 @@ export const DashboardRRHH = () => {
           value={metrics.fichajesPendientes}
           icon={AlertTriangle}
           color={metrics.fichajesPendientes > 0 ? 'red' : 'gray'}
-          onClick={() => navigate('/rrhh/fichajes')}
+          onClick={() => navigate('/dashboard/rrhh/fichajes')}
         />
         
         <MetricCard
@@ -142,7 +142,7 @@ export const DashboardRRHH = () => {
           value={metrics.ausenciasHoy}
           icon={Calendar}
           color="blue"
-          onClick={() => navigate('/rrhh/ausencias')}
+          onClick={() => navigate('/dashboard/rrhh/ausencias')}
         />
         
         <MetricCard
@@ -150,7 +150,7 @@ export const DashboardRRHH = () => {
           value={metrics.documentosCaducados}
           icon={FileWarning}
           color={metrics.documentosCaducados > 0 ? 'orange' : 'gray'}
-          onClick={() => navigate('/rrhh/documentacion')}
+          onClick={() => navigate('/dashboard/rrhh/documentacion')}
         />
       </div>
 
@@ -158,7 +158,7 @@ export const DashboardRRHH = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card 
           className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => navigate('/rrhh/empleados')}
+          onClick={() => navigate('/dashboard/rrhh/empleados')}
         >
           <h3 className="font-semibold text-lg">Empleados</h3>
           <p className="text-sm text-muted-foreground">Gestión de personal</p>
@@ -166,7 +166,7 @@ export const DashboardRRHH = () => {
         
         <Card 
           className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => navigate('/rrhh/fichajes')}
+          onClick={() => navigate('/dashboard/rrhh/fichajes')}
         >
           <h3 className="font-semibold text-lg">Fichajes</h3>
           <p className="text-sm text-muted-foreground">Control horario</p>
@@ -174,7 +174,7 @@ export const DashboardRRHH = () => {
         
         <Card 
           className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => navigate('/rrhh/turnos')}
+          onClick={() => navigate('/dashboard/rrhh/turnos')}
         >
           <h3 className="font-semibold text-lg">Turnos</h3>
           <p className="text-sm text-muted-foreground">Planificación turnos</p>
@@ -182,7 +182,7 @@ export const DashboardRRHH = () => {
         
         <Card 
           className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => navigate('/rrhh/nominas')}
+          onClick={() => navigate('/dashboard/rrhh/nominas')}
         >
           <h3 className="font-semibold text-lg">Nóminas</h3>
           <p className="text-sm text-muted-foreground">Validación nóminas</p>

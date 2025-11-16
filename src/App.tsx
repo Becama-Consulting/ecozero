@@ -74,7 +74,7 @@ const App = () => (
             }
           />
           <Route
-            path="/rrhh"
+            path="/dashboard/rrhh"
             element={
               <ProtectedRoute>
                 <DashboardRRHH />
@@ -82,7 +82,7 @@ const App = () => (
             }
           />
           <Route
-            path="/rrhh/empleados"
+            path="/dashboard/rrhh/empleados"empleados"
             element={
               <ProtectedRoute>
                 <Empleados />
@@ -90,7 +90,7 @@ const App = () => (
             }
           />
           <Route
-            path="/rrhh/fichajes"
+            path="/dashboard/rrhh/fichajes"/fichajes"
             element={
               <ProtectedRoute>
                 <Fichajes />
@@ -98,7 +98,7 @@ const App = () => (
             }
           />
           <Route
-            path="/rrhh/turnos"
+            path="/dashboard/rrhh/turnos"hh/turnos"
             element={
               <ProtectedRoute>
                 <Turnos />
@@ -106,7 +106,7 @@ const App = () => (
             }
           />
           <Route
-            path="/rrhh/ausencias"
+            path="/dashboard/rrhh/ausencias"ausencias"
             element={
               <ProtectedRoute>
                 <Ausencias />
@@ -114,7 +114,7 @@ const App = () => (
             }
           />
           <Route
-            path="/rrhh/nominas"
+            path="/dashboard/rrhh/nominas"h/nominas"
             element={
               <ProtectedRoute>
                 <Nominas />
@@ -122,7 +122,7 @@ const App = () => (
             }
           />
           <Route
-            path="/rrhh/documentacion"
+            path="/dashboard/rrhh/documentacion"mentacion"
             element={
               <ProtectedRoute>
                 <Documentacion />
@@ -130,7 +130,7 @@ const App = () => (
             }
           />
           <Route
-            path="/rrhh/empleados-ett"
+            path="/dashboard/rrhh/empleados-ett"
             element={
               <ProtectedRoute>
                 <EmpleadosETT />
