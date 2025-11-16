@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { EditOFModal } from "@/components/produccion";
+import { EditOFModal, PhotoGallery, PhotoUpload } from "@/components/produccion";
 
 interface FabricationOrder {
   id: string;
@@ -304,6 +304,107 @@ const FichaOF = () => {
     }
   };
 
+  const handlePhotoUploaded = async (stepId: string, url: string) => {
+    try {
+      const step = steps.find(s => s.id === stepId);
+      if (!step) return;
+
+      const updatedPhotos = [...(step.photos || []), url];
+      const photoMetadata = step.data_json?.photoMetadata || {};
+      
+      photoMetadata[url] = {
+        uploadedBy: user?.id,
+        uploadedAt: new Date().toISOString(),
+        validated: undefined
+      };
+
+      const { error } = await supabase
+        .from('production_steps')
+        .update({ 
+          photos: updatedPhotos,
+          data_json: { ...step.data_json, photoMetadata }
+        })
+        .eq('id', stepId);
+
+      if (error) throw error;
+      
+      toast.success('Foto subida correctamente');
+      fetchOFData();
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      toast.error('Error al subir foto');
+    }
+  };
+
+  const handleValidatePhoto = async (stepId: string, photoUrl: string, approved: boolean, comment: string) => {
+    try {
+      const step = steps.find(s => s.id === stepId);
+      if (!step) return;
+
+      const photoMetadata = step.data_json?.photoMetadata || {};
+      
+      photoMetadata[photoUrl] = {
+        ...photoMetadata[photoUrl],
+        validated: approved,
+        validationComment: comment || undefined,
+        validatedBy: user?.id,
+        validatedAt: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('production_steps')
+        .update({ 
+          data_json: { ...step.data_json, photoMetadata }
+        })
+        .eq('id', stepId);
+
+      if (error) throw error;
+
+      toast.success(approved ? 'Foto aprobada' : 'Foto rechazada');
+      fetchOFData();
+    } catch (error) {
+      console.error('Error validating photo:', error);
+      toast.error('Error al validar foto');
+    }
+  };
+
+  const handleDeletePhoto = async (stepId: string, photoUrl: string) => {
+    try {
+      const step = steps.find(s => s.id === stepId);
+      if (!step) return;
+
+      const updatedPhotos = step.photos?.filter(p => p !== photoUrl) || [];
+      const photoMetadata = step.data_json?.photoMetadata || {};
+      delete photoMetadata[photoUrl];
+
+      // Extraer path del Storage
+      const urlParts = photoUrl.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+
+      // Eliminar de Storage
+      await supabase.storage
+        .from('production-photos')
+        .remove([fileName]);
+
+      // Actualizar DB
+      const { error } = await supabase
+        .from('production_steps')
+        .update({ 
+          photos: updatedPhotos,
+          data_json: { ...step.data_json, photoMetadata }
+        })
+        .eq('id', stepId);
+
+      if (error) throw error;
+
+      toast.success('Foto eliminada');
+      fetchOFData();
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      toast.error('Error al eliminar foto');
+    }
+  };
+
   const getStepStatusIcon = (status: string) => {
     switch (status) {
       case "completado":
@@ -563,7 +664,36 @@ const FichaOF = () => {
                           <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-auto">{JSON.stringify(step.data_json, null, 2)}</pre>
                         </div>
                       )}
-                      {step.photos && step.photos.length > 0 && (<p className="text-sm">📷 {step.photos.length} foto(s) adjunta(s)</p>)}
+                      
+                      {/* SECCIÓN DE FOTOS */}
+                      <div className="border-t pt-4 mt-4">
+                        <h4 className="font-semibold mb-3 flex items-center gap-2 text-sm">
+                          📷 Fotos del Paso ({step.photos?.length || 0})
+                        </h4>
+
+                        {/* Upload de fotos */}
+                        {step.status !== 'completada' && step.status !== 'completado' && (
+                          <div className="mb-4">
+                            <PhotoUpload
+                              onPhotoUploaded={(url) => handlePhotoUploaded(step.id, url)}
+                              existingPhotos={[]}
+                            />
+                          </div>
+                        )}
+
+                        {/* Galería de fotos */}
+                        {step.photos && step.photos.length > 0 && (
+                          <PhotoGallery
+                            photos={step.photos}
+                            metadata={step.data_json?.photoMetadata || {}}
+                            onValidate={(photoUrl, approved, comment) => handleValidatePhoto(step.id, photoUrl, approved, comment)}
+                            onDelete={(photoUrl) => handleDeletePhoto(step.id, photoUrl)}
+                            canValidate={user?.id ? true : false}
+                            canDelete={true}
+                          />
+                        )}
+                      </div>
+
                       <div className="mt-4 flex gap-2">{getStepActions(step, index + 1)}</div>
                     </div>
                   ) : (<p className="text-sm text-muted-foreground">Pendiente de asignación</p>)}
