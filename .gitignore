@@ -12,13 +12,6 @@ dist
 dist-ssr
 *.local
 
-# Environment variables - TEMPORARY: .env allowed for Lovable
-# .env
-# Environment variables - Protect production only
-.env.local
-.env.production
-.env.development
-.env.*.local
 
 # Editor directories and files
 .vscode/*

@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { MetricCard } from '@/components/rrhh/MetricCard';
 import { Users, AlertTriangle, Calendar, FileWarning } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export const DashboardRRHH = () => {
-  const { user, userRoles, loading } = useAuth();
+  const { user, userRoles, loading, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -21,26 +22,12 @@ export const DashboardRRHH = () => {
     documentosCaducados: 0
   });
 
-  // Verificar permisos
+  // Cargar métricas cuando el usuario esté listo
   useEffect(() => {
-    if (!loading && user) {
-      const hasAccess = userRoles.some(r => 
-        r.role === 'admin_global' || 
-        r.role === 'admin_departamento'
-      );
-      
-      if (!hasAccess) {
-        navigate('/');
-      }
-    }
-  }, [loading, user, userRoles, navigate]);
-
-  // Cargar métricas
-  useEffect(() => {
-    if (!loading && user) {
+    if (!loading && user && userRoles.length > 0) {
       loadMetrics();
     }
-  }, [loading, user]);
+  }, [loading, user, userRoles]);
 
   const loadMetrics = async () => {
     try {
@@ -104,6 +91,19 @@ export const DashboardRRHH = () => {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Verificar permisos después de cargar
+  if (!loading && user && userRoles.length > 0 && !isAdmin()) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Acceso Denegado</h2>
+          <p className="text-muted-foreground mb-4">No tienes permisos para acceder a este módulo</p>
+          <Button onClick={() => navigate('/')}>Volver al inicio</Button>
+        </div>
       </div>
     );
   }
