@@ -82,7 +82,7 @@ const App = () => (
             }
           />
           <Route
-            path="/dashboard/rrhh/empleados"empleados"
+            path="/dashboard/rrhh/empleados"
             element={
               <ProtectedRoute>
                 <Empleados />
@@ -90,7 +90,7 @@ const App = () => (
             }
           />
           <Route
-            path="/dashboard/rrhh/fichajes"/fichajes"
+            path="/dashboard/rrhh/fichajes"
             element={
               <ProtectedRoute>
                 <Fichajes />
@@ -98,7 +98,7 @@ const App = () => (
             }
           />
           <Route
-            path="/dashboard/rrhh/turnos"hh/turnos"
+            path="/dashboard/rrhh/turnos"
             element={
               <ProtectedRoute>
                 <Turnos />
@@ -106,7 +106,7 @@ const App = () => (
             }
           />
           <Route
-            path="/dashboard/rrhh/ausencias"ausencias"
+            path="/dashboard/rrhh/ausencias"
             element={
               <ProtectedRoute>
                 <Ausencias />
@@ -114,7 +114,7 @@ const App = () => (
             }
           />
           <Route
-            path="/dashboard/rrhh/nominas"h/nominas"
+            path="/dashboard/rrhh/nominas"
             element={
               <ProtectedRoute>
                 <Nominas />
@@ -122,7 +122,7 @@ const App = () => (
             }
           />
           <Route
-            path="/dashboard/rrhh/documentacion"mentacion"
+            path="/dashboard/rrhh/documentacion"
             element={
               <ProtectedRoute>
                 <Documentacion />
