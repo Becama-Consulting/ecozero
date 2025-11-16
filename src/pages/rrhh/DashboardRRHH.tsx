@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { MetricCard } from '@/components/rrhh/MetricCard';
 import { Users, AlertTriangle, Calendar, FileWarning } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export const DashboardRRHH = () => {
-  const { user, userRoles, loading } = useAuth();
+  const { user, userRoles, loading, hasRole, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -38,6 +39,11 @@ export const DashboardRRHH = () => {
       loadMetrics();
     }
   }, [loading, user]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
 
   const loadMetrics = async () => {
     try {
@@ -110,12 +116,21 @@ export const DashboardRRHH = () => {
       <div className="container mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="bg-gradient-to-r from-warning/10 via-warning/5 to-transparent rounded-lg p-6 border border-warning/20">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-warning to-warning-foreground bg-clip-text text-transparent">
-            Dashboard RRHH
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Gestión de Recursos Humanos - EcoZero
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-warning to-warning-foreground bg-clip-text text-transparent">
+                Dashboard RRHH
+              </h1>
+              <p className="text-muted-foreground mt-2">
+                Gestión de Recursos Humanos - EcoZero
+              </p>
+            </div>
+            {hasRole('admin_global') ? (
+              <Button onClick={() => navigate("/")}>Volver al inicio</Button>
+            ) : (
+              <Button variant="outline" onClick={handleSignOut}>Salir</Button>
+            )}
+          </div>
         </div>
 
         {/* Métricas del día */}
