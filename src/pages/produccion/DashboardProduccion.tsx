@@ -34,7 +34,7 @@ interface UserData {
 }
 
 const DashboardProduccion = () => {
-  const { user, isAdmin, hasRole } = useAuth();
+  const { user, isAdmin, hasRole, signOut } = useAuth();
   const { permission, requestPermission } = useNotifications();
   const navigate = useNavigate();
   const [lineas, setLineas] = useState<LineaStats[]>([]);
@@ -50,6 +50,11 @@ const DashboardProduccion = () => {
   const [priorityAlerts, setPriorityAlerts] = useState<any[]>([]);
   const [showAllOFs, setShowAllOFs] = useState(false);
   const [selectedLineForAssignment, setSelectedLineForAssignment] = useState<string | null>(null);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -358,9 +363,11 @@ const DashboardProduccion = () => {
               <AlertTriangle className="mr-2 h-4 w-4" />
               Alertas ({alertas})
             </Button>
-            <Button onClick={() => navigate("/")}>
-              Volver al inicio
-            </Button>
+            {hasRole('admin_global') ? (
+              <Button onClick={() => navigate("/")}>Volver al inicio</Button>
+            ) : (
+              <Button variant="outline" onClick={handleSignOut}>Salir</Button>
+            )}
           </div>
         </div>
 
