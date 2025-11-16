@@ -3,10 +3,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { EditOFModal } from "@/components/produccion";
+import { useAuth } from "@/hooks/useAuth";
 
 interface FabricationOrder {
   id: string;
@@ -45,12 +49,25 @@ const STEP_NAMES = [
 const FichaOF = () => {
   const { ofId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [of, setOf] = useState<FabricationOrder | null>(null);
   const [steps, setSteps] = useState<ProductionStep[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [operarios, setOperarios] = useState<Array<{ id: string; name: string }>>([]);
+  const [history, setHistory] = useState<Array<{
+    id: string;
+    action: string;
+    old_value: string | null;
+    new_value: string | null;
+    created_at: string;
+    profiles: { name: string } | null;
+  }>>([]);
 
   useEffect(() => {
     fetchOFData();
+    fetchOperarios();
+    fetchHistory();
     setupRealtimeSubscriptions();
   }, [ofId]);
 
