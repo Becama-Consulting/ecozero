@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, AlertTriangle, Plus, Map, Key, Bell } from "lucide-react";
+import { Loader2, AlertTriangle, Plus, Map, Key, Bell, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateCredentialsModal } from "@/components/admin/GenerateCredentialsModal";
 import { CreateOFModal } from "@/components/produccion/CreateOFModal";
@@ -388,6 +388,33 @@ const DashboardProduccion = () => {
                 </div>
                 <Button onClick={requestPermission} variant="default">
                   Activar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Botón Dashboard Supervisor */}
+        {(hasRole('admin_global') || hasRole('admin_departamento') || hasRole('supervisor')) && (
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Crown className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <h3 className="font-semibold text-blue-900">Dashboard de Supervisor</h3>
+                    <p className="text-sm text-blue-700">
+                      Accede a métricas avanzadas, vista completa de todas las OFs y análisis en tiempo real
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => navigate('/dashboard/produccion/supervisor')}
+                  variant="default"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Crown className="mr-2 h-4 w-4" />
+                  Acceder
                 </Button>
               </div>
             </CardContent>
