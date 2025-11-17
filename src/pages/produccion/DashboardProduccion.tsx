@@ -230,11 +230,12 @@ const DashboardProduccion = () => {
         .from("alerts")
         .select(`
           id,
-          message,
+          title,
+          description,
           severity,
-          type,
+          alert_type,
           created_at,
-          related_of_id
+          of_id
         `)
         .is("resolved_at", null)
         .order("severity", { ascending: false })
@@ -484,14 +485,14 @@ const DashboardProduccion = () => {
                     <AlertTriangle className="mr-2 h-4 w-4" />
                     Alertas
                     {priorityAlerts.filter(a => 
-                      a.related_of_id && recentOFs.find(of => 
-                        of.id === a.related_of_id && of.line_id === linea.id
+                      a.of_id && recentOFs.find(of => 
+                        of.id === a.of_id && of.line_id === linea.id
                       )
                     ).length > 0 && (
                       <Badge variant="destructive" className="ml-2">
                         {priorityAlerts.filter(a => 
-                          a.related_of_id && recentOFs.find(of => 
-                            of.id === a.related_of_id && of.line_id === linea.id
+                          a.of_id && recentOFs.find(of => 
+                            of.id === a.of_id && of.line_id === linea.id
                           )
                         ).length}
                       </Badge>
@@ -650,21 +651,21 @@ const DashboardProduccion = () => {
                   <Card 
                     key={alert.id} 
                     className={`p-3 cursor-pointer hover:bg-muted/50 border-l-4 ${
-                      alert.severity === 'critical' ? 'border-destructive' :
-                      alert.severity === 'warning' ? 'border-warning' :
+                      alert.severity === 5 ? 'border-destructive' :
+                      alert.severity === 4 ? 'border-warning' :
                       'border-blue-500'
                     }`}
                     onClick={() => navigate('/dashboard/produccion/alertas')}
                   >
                     <div className="flex items-start gap-2">
                       <span className="text-xl">
-                        {alert.severity === 'critical' ? '🔴' :
-                         alert.severity === 'warning' ? '🟡' : '🔵'}
+                        {alert.severity === 5 ? '🔴' :
+                         alert.severity === 4 ? '🟡' : '🔵'}
                       </span>
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{alert.message}</p>
+                        <p className="text-sm font-medium">{alert.title}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {new Date(alert.created_at).toLocaleString('es-ES')} • {alert.type.replace('_', ' ').toUpperCase()}
+                          {new Date(alert.created_at).toLocaleString('es-ES')} • {alert.alert_type?.replace('_', ' ').toUpperCase()}
                         </p>
                       </div>
                     </div>

@@ -61,7 +61,7 @@ export const CreateOFModal = ({ isOpen, onClose, onSuccess }: CreateOFModalProps
     setLoading(true);
 
     try {
-      const { error } = await supabase
+      const { data: newOF, error } = await supabase
         .from('fabrication_orders')
         .insert({
           customer,
@@ -70,9 +70,34 @@ export const CreateOFModal = ({ isOpen, onClose, onSuccess }: CreateOFModalProps
           sap_id: sapId || null,
           status: 'pendiente',
           supervisor_id: user.id,
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // 🔗 WEBHOOK N8N: Notificar nueva OF creada
+      try {
+        const n8nUrl = import.meta.env.VITE_N8N_BASE_URL;
+        if (n8nUrl && newOF) {
+          await fetch(`${n8nUrl}/webhook/new-of`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              of_id: newOF.id,
+              customer: customer,
+              line_id: lineId || null,
+              priority: priority,
+              sap_id: sapId || newOF.id.slice(0, 8),
+              created_at: new Date().toISOString(),
+              created_by: user.id
+            })
+          });
+        }
+      } catch (webhookError) {
+        console.error('N8N webhook error:', webhookError);
+        // No bloqueamos la creación de OF si falla el webhook
+      }
 
       toast.success('OF creada exitosamente');
       
