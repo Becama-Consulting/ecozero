@@ -9,6 +9,7 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import DashboardGlobal from "./pages/admin/DashboardGlobal";
 import DashboardProduccion from "./pages/produccion/DashboardProduccion";
 import DashboardSupervisor from "./pages/produccion/DashboardSupervisor";
+import SecuenciacionProduccion from "./pages/produccion/SecuenciacionProduccion";
 import DetalleLinea from "./pages/produccion/DetalleLinea";
 import FichaOF from "./pages/produccion/FichaOF";
 import Alertas from "./pages/produccion/Alertas";
@@ -55,6 +56,14 @@ const App = () => (
             element={
               <ProtectedRoute allowedRoles={['admin_global', 'admin_departamento', 'supervisor']}>
                 <DashboardSupervisor />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/produccion/secuenciacion"
+            element={
+              <ProtectedRoute allowedRoles={['admin_global', 'admin_departamento', 'supervisor']}>
+                <SecuenciacionProduccion />
               </ProtectedRoute>
             }
           />
