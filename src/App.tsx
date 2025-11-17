@@ -8,6 +8,7 @@ import Auth from "./pages/auth/Auth.tsx";
 import AdminUsers from "./pages/admin/AdminUsers";
 import DashboardGlobal from "./pages/admin/DashboardGlobal";
 import DashboardProduccion from "./pages/produccion/DashboardProduccion";
+import DashboardSupervisor from "./pages/produccion/DashboardSupervisor";
 import DetalleLinea from "./pages/produccion/DetalleLinea";
 import FichaOF from "./pages/produccion/FichaOF";
 import Alertas from "./pages/produccion/Alertas";
@@ -46,6 +47,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <DashboardProduccion />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/produccion/supervisor"
+            element={
+              <ProtectedRoute allowedRoles={['admin_global', 'admin_departamento', 'supervisor']}>
+                <DashboardSupervisor />
               </ProtectedRoute>
             }
           />
