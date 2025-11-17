@@ -10,6 +10,7 @@ import DashboardGlobal from "./pages/admin/DashboardGlobal";
 import DashboardProduccion from "./pages/produccion/DashboardProduccion";
 import DashboardSupervisor from "./pages/produccion/DashboardSupervisor";
 import SecuenciacionProduccion from "./pages/produccion/SecuenciacionProduccion";
+import GestionNaves from "./pages/produccion/GestionNaves";
 import DetalleLinea from "./pages/produccion/DetalleLinea";
 import FichaOF from "./pages/produccion/FichaOF";
 import Alertas from "./pages/produccion/Alertas";
@@ -64,6 +65,14 @@ const App = () => (
             element={
               <ProtectedRoute allowedRoles={['admin_global', 'admin_departamento', 'supervisor']}>
                 <SecuenciacionProduccion />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/produccion/naves"
+            element={
+              <ProtectedRoute allowedRoles={['admin_global', 'admin_departamento', 'supervisor']}>
+                <GestionNaves />
               </ProtectedRoute>
             }
           />

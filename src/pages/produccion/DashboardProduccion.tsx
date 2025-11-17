@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, AlertTriangle, Plus, Map, Key, Bell, Crown, Settings } from "lucide-react";
+import { Loader2, AlertTriangle, Plus, Map, Key, Bell, Crown, Settings, Workflow, Warehouse } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateCredentialsModal } from "@/components/admin/GenerateCredentialsModal";
 import { CreateOFModal } from "@/components/produccion/CreateOFModal";
@@ -760,6 +760,43 @@ const DashboardProduccion = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Panel de Supervisor y Secuenciación - Solo para admin_global, admin_departamento, supervisor */}
+        {(isAdmin || hasRole('admin_departamento') || hasRole('supervisor')) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Crown className="h-5 w-5" />
+                Panel de Supervisión
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button
+                onClick={() => navigate('/dashboard/produccion/supervisor')}
+                className="w-full"
+                variant="outline"
+              >
+                <Crown className="mr-2 h-4 w-4" />
+                Dashboard Supervisor
+              </Button>
+              <Button
+                onClick={() => navigate('/dashboard/produccion/secuenciacion')}
+                className="w-full"
+              >
+                <Workflow className="mr-2 h-4 w-4" />
+                Secuenciación de Producción
+              </Button>
+              <Button
+                onClick={() => navigate('/dashboard/produccion/naves')}
+                className="w-full"
+                variant="outline"
+              >
+                <Warehouse className="mr-2 h-4 w-4" />
+                Gestión de Naves
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Modals */}
         <GenerateCredentialsModal
