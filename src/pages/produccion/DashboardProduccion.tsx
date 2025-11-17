@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, AlertTriangle, Plus, Map, Key, Bell, Crown } from "lucide-react";
+import { Loader2, AlertTriangle, Plus, Map, Key, Bell, Crown, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateCredentialsModal } from "@/components/admin/GenerateCredentialsModal";
 import { CreateOFModal } from "@/components/produccion/CreateOFModal";
@@ -421,6 +421,33 @@ const DashboardProduccion = () => {
           </Card>
         )}
 
+        {/* Botón Secuenciación */}
+        {(hasRole('admin_global') || hasRole('admin_departamento') || hasRole('supervisor')) && (
+          <Card className="border-green-200 bg-green-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Settings className="h-5 w-5 text-green-600" />
+                  <div>
+                    <h3 className="font-semibold text-green-900">Secuenciación Automatizada</h3>
+                    <p className="text-sm text-green-700">
+                      Optimiza la producción con algoritmos inteligentes y detecta conflictos automáticamente
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => navigate('/dashboard/produccion/secuenciacion')}
+                  variant="default"
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Secuenciar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Métricas Globales */}
         <Card>
           <CardHeader>
@@ -512,14 +539,14 @@ const DashboardProduccion = () => {
                     <AlertTriangle className="mr-2 h-4 w-4" />
                     Alertas
                     {priorityAlerts.filter(a => 
-                      a.of_id && recentOFs.find(of => 
-                        of.id === a.of_id && of.line_id === linea.id
+                      a.related_of_id && recentOFs.find(of => 
+                        of.id === a.related_of_id && of.line_id === linea.id
                       )
                     ).length > 0 && (
                       <Badge variant="destructive" className="ml-2">
                         {priorityAlerts.filter(a => 
-                          a.of_id && recentOFs.find(of => 
-                            of.id === a.of_id && of.line_id === linea.id
+                          a.related_of_id && recentOFs.find(of => 
+                            of.id === a.related_of_id && of.line_id === linea.id
                           )
                         ).length}
                       </Badge>
