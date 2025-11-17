@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, AlertTriangle, Plus, Map, Key, Bell, Crown, Settings, Workflow, Warehouse } from "lucide-react";
+import { Loader2, AlertTriangle, Plus, Map, Key, Bell, Crown, Settings, Workflow, Warehouse, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateCredentialsModal } from "@/components/admin/GenerateCredentialsModal";
 import { CreateOFModal } from "@/components/produccion/CreateOFModal";
@@ -741,9 +741,13 @@ const DashboardProduccion = () => {
                 <Plus className="mr-2 h-5 w-5" />
                 Nueva OF
               </Button>
-              <Button className="h-auto py-4" variant="outline">
-                <Map className="mr-2 h-5 w-5" />
-                Naves Digitales
+              <Button 
+                className="h-auto py-4" 
+                variant="outline"
+                onClick={() => navigate("/dashboard/produccion/registro")}
+              >
+                <ClipboardList className="mr-2 h-5 w-5" />
+                Registro Digital
               </Button>
               <Button className="h-auto py-4" variant="outline" onClick={() => navigate("/dashboard/produccion/alertas")}>
                 <AlertTriangle className="mr-2 h-5 w-5" />
