@@ -123,14 +123,20 @@ const DashboardProduccion = () => {
             .in("status", ["pendiente", "en_proceso"]);
 
           // Calcular tiempo promedio real de OFs completadas en últimos 30 días
-          const { data: completedOFs } = await supabase
-            .from("fabrication_orders")
-            .select("started_at, completed_at")
-            .eq("line_id", line.id)
-            .eq("status", "completada")
-            .not("started_at", "is", null)
-            .not("completed_at", "is", null)
-            .gte("completed_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+          // Consultas separadas para evitar error 400
+          const completedOFsPromises = ['completada', 'validada', 'albarana'].map(status =>
+            supabase
+              .from("fabrication_orders")
+              .select("started_at, completed_at")
+              .eq("line_id", line.id)
+              .eq("status", status)
+              .not("started_at", "is", null)
+              .not("completed_at", "is", null)
+              .gte("completed_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+          );
+          
+          const completedOFsResults = await Promise.all(completedOFsPromises);
+          const completedOFs = completedOFsResults.flatMap(result => result.data || []);
 
           let tiempo_promedio = "N/A";
           if (completedOFs && completedOFs.length > 0) {
@@ -172,13 +178,20 @@ const DashboardProduccion = () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      const { count: completedCount } = await supabase
-        .from("fabrication_orders")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "completada")
-        .gte("completed_at", today.toISOString());
+      // Consultas separadas por status para evitar error 400
+      const completedTodayPromises = ['completada', 'validada', 'albarana'].map(status =>
+        supabase
+          .from("fabrication_orders")
+          .select("id", { count: "exact", head: true })
+          .eq("status", status)
+          .not("completed_at", "is", null)
+          .gte("completed_at", today.toISOString())
+      );
+      
+      const completedTodayResults = await Promise.all(completedTodayPromises);
+      const completedCount = completedTodayResults.reduce((sum, result) => sum + (result.count || 0), 0);
 
-      setCompletadasHoy(completedCount || 0);
+      setCompletadasHoy(completedCount);
 
       // Fetch active alerts
       const { count: alertsCount } = await supabase
