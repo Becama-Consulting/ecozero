@@ -38,14 +38,14 @@ jobs:
         run: |
           echo "📦 Copiando archivos al VPS..."
           rsync -avz --delete -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            dist/ ubuntu@${{ secrets.VPS_HOST }}:/srv/repos/ecozero/dist/
+            dist/ ubuntu@${{ secrets.VPS_HOST }}:/srv/repos/ecocero/dist/
           
           echo "📋 Copiando script de deploy..."
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            deploy.sh ubuntu@${{ secrets.VPS_HOST }}:/srv/repos/ecozero/
+            deploy.sh ubuntu@${{ secrets.VPS_HOST }}:/srv/repos/ecocero/
 
       - name: Execute deploy script
         run: |
           echo "🚀 Ejecutando deploy en el VPS..."
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            ubuntu@${{ secrets.VPS_HOST }} "cd /srv/repos/ecozero && ./deploy.sh"
+            ubuntu@${{ secrets.VPS_HOST }} "cd /srv/repos/ecocero && ./deploy.sh"

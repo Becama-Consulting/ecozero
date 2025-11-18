@@ -30,10 +30,21 @@ CONTAINER_NAME="ecocero-web"
 echo "🚀 Deploy script iniciado para ${APP_NAME}"
 echo "📥 Paso 0/3: actualizando código desde GitHub en ${REPO_DIR}"
 
-cd "${REPO_DIR}"
-
 # Configurar GIT_SSH_COMMAND para usar la clave de Becama-Consulting
 export GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519_becama -o IdentitiesOnly=yes"
+
+# Verificar si el directorio existe, si no, clonarlo
+if [ ! -d "${REPO_DIR}" ]; then
+  echo "📦 El directorio ${REPO_DIR} no existe. Creando estructura..."
+  sudo mkdir -p "${REPO_DIR}"
+  
+  # Si queremos clonar el repo (necesitarás ajustar la URL del repo)
+  echo "⚠️  Nota: Debes clonar el repositorio manualmente o proporcionar la URL"
+  echo "   Ejemplo: git clone git@github.com:Becama-Consulting/ecocero.git ${REPO_DIR}"
+  exit 1
+fi
+
+cd "${REPO_DIR}"
 
 # Aseguramos que estamos en main y sincronizados con origin/main
 git fetch origin
