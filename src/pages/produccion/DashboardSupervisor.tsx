@@ -112,6 +112,7 @@ const DashboardSupervisor = () => {
         .from('fabrication_orders')
         .select('*', { count: 'exact', head: true })
         .in('status', ['completada', 'validada', 'albarana'])
+        .not('completed_at', 'is', null)
         .gte('completed_at', `${today}T00:00:00`)
         .lte('completed_at', `${today}T23:59:59`);
 
@@ -171,6 +172,7 @@ const DashboardSupervisor = () => {
         .from('fabrication_orders')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'en_proceso')
+        .not('started_at', 'is', null)
         .lt('started_at', twoDaysAgo.toISOString());
 
       // Eficiencia semanal
@@ -185,12 +187,14 @@ const DashboardSupervisor = () => {
         .from('fabrication_orders')
         .select('*', { count: 'exact', head: true })
         .in('status', ['completada', 'validada', 'albarana'])
+        .not('completed_at', 'is', null)
         .gte('completed_at', thisWeekStart.toISOString());
 
       const { count: lastWeekCompleted } = await supabase
         .from('fabrication_orders')
         .select('*', { count: 'exact', head: true })
         .in('status', ['completada', 'validada', 'albarana'])
+        .not('completed_at', 'is', null)
         .gte('completed_at', lastWeekStart.toISOString())
         .lt('completed_at', thisWeekStart.toISOString());
 
