@@ -112,20 +112,6 @@ const DetallePedido = () => {
   };
 
   const prepararMaterialPedido = async () => {
-    // NOTA: Esta funcionalidad requiere crear la tabla 'bom_items' en Supabase
-    // Estructura sugerida:
-    // - of_id (uuid, foreign key a fabrication_orders)
-    // - material_codigo (text)
-    // - material_descripcion (text)
-    // - cantidad_necesaria (numeric)
-    // - cantidad_recibida (numeric, default 0)
-    // - unidad (text)
-    // - estado (text, valores: 'pendiente', 'solicitado', 'recibido')
-    
-    toast.error('Funcionalidad pendiente: Crear tabla bom_items en la base de datos');
-    
-    // TODO: Descomentar cuando exista la tabla bom_items
-    /*
     try {
       const ofIds = ofs.map(of => of.id);
       
@@ -168,16 +154,9 @@ const DetallePedido = () => {
       console.error('Error:', error);
       toast.error('Error al consultar materiales');
     }
-    */
   };
 
   const confirmarSolicitudMaterial = async () => {
-    // NOTA: Esta funcionalidad requiere crear la tabla 'bom_items'
-    toast.error('Funcionalidad pendiente: Crear tabla bom_items en la base de datos');
-    setShowMaterialModal(false);
-    
-    // TODO: Descomentar cuando exista la tabla bom_items
-    /*
     try {
       setProcessingMaterial(true);
       const ofIds = ofs.map(of => of.id);
@@ -196,13 +175,14 @@ const DetallePedido = () => {
         .from('fabrication_orders')
         .update({ 
           status: 'material_solicitado',
-          material_preparado: true 
+          material_preparado: true,
+          material_solicitado_at: new Date().toISOString()
         })
         .in('id', ofIds);
 
-      // Enviar webhook
+      // Enviar webhook N8N
       try {
-        await fetch('https://n8n.becama.es/webhook/solicitud-material-produccion', {
+        await fetch('https://n8n-n8n.wgjrqh.easypanel.host/webhook/solicitud-material-produccion', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -215,11 +195,12 @@ const DetallePedido = () => {
           })
         });
       } catch (webhookError) {
-        console.warn('Error webhook:', webhookError);
+        console.warn('Error webhook N8N:', webhookError);
+        // No bloqueamos la operación si falla el webhook
       }
 
       setShowMaterialModal(false);
-      toast.success('Material solicitado correctamente');
+      toast.success('Material solicitado correctamente a logística');
       fetchPedidoData();
     } catch (error) {
       console.error('Error:', error);
@@ -227,7 +208,6 @@ const DetallePedido = () => {
     } finally {
       setProcessingMaterial(false);
     }
-    */
   };
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
