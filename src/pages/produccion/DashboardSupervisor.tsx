@@ -45,13 +45,19 @@ const DashboardSupervisor = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // ACCESO TEMPORAL DESACTIVADO PARA PRESENTACIÓN
     // Verificar permisos
-    const allowedRoles = ['admin_global', 'admin_departamento', 'supervisor'];
-    const hasPermission = allowedRoles.some(role => hasRole(role as any));
+    // const allowedRoles = ['admin_global', 'admin_departamento', 'supervisor'];
+    // const hasPermission = allowedRoles.some(role => hasRole(role as any));
     
-    if (!user || !hasPermission) {
-      toast.error('No tienes permisos para acceder a este dashboard');
-      navigate('/dashboard/produccion');
+    // if (!user || !hasPermission) {
+    //   toast.error('No tienes permisos para acceder a este dashboard');
+    //   navigate('/dashboard/produccion');
+    //   return;
+    // }
+
+    if (!user) {
+      navigate('/auth');
       return;
     }
 
