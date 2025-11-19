@@ -2,287 +2,112 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useNotifications } from "@/hooks/useNotifications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, AlertTriangle, Plus, Map, Key, Bell, Crown, Settings, Workflow, Warehouse, ClipboardList } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Bell, ArrowLeft, Package2 } from "lucide-react";
 import { toast } from "sonner";
-import { GenerateCredentialsModal } from "@/components/admin/GenerateCredentialsModal";
-import { CreateOFModal } from "@/components/produccion/CreateOFModal";
-import { OFFilters, type OFFilters as OFFiltersType } from "@/components/produccion/OFFilters";
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-interface LineaStats {
-  id: string;
-  name: string;
-  status: "active" | "paused" | "error";
-  ofs_activas: number;
-  capacity: number;
-  tiempo_promedio: string;
-  ultima_actualizacion: string;
-}
-
-interface UserData {
-  id: string;
-  email: string;
-  name: string;
-  departamento?: string;
-  roles: string[];
+interface OrderSummary {
+  customer: string;
+  total_ofs: number;
+  completed_ofs: number;
+  in_progress_ofs: number;
+  pending_ofs: number;
 }
 
 const DashboardProduccion = () => {
-  const { user, isAdmin, hasRole, signOut } = useAuth();
-  const { permission, requestPermission } = useNotifications();
+  const { user, hasRole, signOut } = useAuth();
   const navigate = useNavigate();
-  const [lineas, setLineas] = useState<LineaStats[]>([]);
+  const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [allOFs, setAllOFs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [totalOFs, setTotalOFs] = useState(0);
-  const [completadasHoy, setCompletadasHoy] = useState(0);
-  const [alertas, setAlertas] = useState(0);
-  const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
-  const [isCreateOFModalOpen, setIsCreateOFModalOpen] = useState(false);
-  const [users, setUsers] = useState<UserData[]>([]);
-  const [filters, setFilters] = useState<OFFiltersType>({});
-  const [recentOFs, setRecentOFs] = useState<any[]>([]);
-  const [priorityAlerts, setPriorityAlerts] = useState<any[]>([]);
-  const [showAllOFs, setShowAllOFs] = useState(false);
-  const [selectedLineForAssignment, setSelectedLineForAssignment] = useState<string | null>(null);
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/auth');
-  };
+  const [filters, setFilters] = useState({ status: 'all', customer: '' });
 
   useEffect(() => {
     if (!user) return;
-
     // Acceso permitido para: admin_global, admin_departamento, supervisor, operario, quality
-    // (básicamente todos los roles de producción)
-    
-    fetchDashboardData();
-    loadUsers();
+    fetchOrdersData();
     setupRealtimeSubscriptions();
-  }, [user, filters, showAllOFs]);
+  }, [user, filters]);
 
-  const loadUsers = async () => {
+  const fetchOrdersData = async () => {
     try {
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, email, name, departamento");
-
-      if (profilesError) throw profilesError;
-
-      // Get roles for each user
-      const usersWithRoles = await Promise.all(
-        (profiles || []).map(async (profile) => {
-          const { data: roles, error: rolesError } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", profile.id);
-
-          if (rolesError) throw rolesError;
-
-          return {
-            id: profile.id,
-            email: profile.email,
-            name: profile.name,
-            departamento: profile.departamento || "N/A",
-            roles: roles?.map((r) => r.role) || [],
-          };
-        })
-      );
-
-      setUsers(usersWithRoles);
-    } catch (error) {
-      console.error("Error loading users:", error);
-    }
-  };
-
-  const fetchDashboardData = async () => {
-    try {
-      // Fetch production lines
-      const { data: lines, error: linesError } = await supabase
-        .from("production_lines")
-        .select("*")
-        .order("name");
-
-      if (linesError) throw linesError;
-
-      // Applied filters are now handled when fetching specific data below
-
-      // Fetch OFs for each line
-      const lineasStats: LineaStats[] = await Promise.all(
-        (lines || []).map(async (line) => {
-          const { count } = await supabase
-            .from("fabrication_orders")
-            .select("id", { count: "exact", head: true })
-            .eq("line_id", line.id)
-            .in("status", ["pendiente", "en_proceso"]);
-
-          // Calcular tiempo promedio real de OFs completadas en últimos 30 días
-          // Consultas separadas para evitar error 400
-          const completedOFsPromises = (['completada', 'validada', 'albarana'] as const).map(status =>
-            supabase
-              .from("fabrication_orders")
-              .select("started_at, completed_at")
-              .eq("line_id", line.id)
-              .eq("status", status)
-              .not("started_at", "is", null)
-              .not("completed_at", "is", null)
-              .gte("completed_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-          );
-          
-          const completedOFsResults = await Promise.all(completedOFsPromises);
-          const completedOFs = completedOFsResults.flatMap(result => result.data || []);
-
-          let tiempo_promedio = "N/A";
-          if (completedOFs && completedOFs.length > 0) {
-            const totalMinutes = completedOFs.reduce((sum, of) => {
-              const start = new Date(of.started_at).getTime();
-              const end = new Date(of.completed_at).getTime();
-              return sum + ((end - start) / (1000 * 60));
-            }, 0);
-            
-            const avgMinutes = Math.round(totalMinutes / completedOFs.length);
-            const hours = Math.floor(avgMinutes / 60);
-            const minutes = avgMinutes % 60;
-            tiempo_promedio = `${hours}h ${minutes}m`;
-          }
-
-          return {
-            id: line.id,
-            name: line.name,
-            status: line.status,
-            ofs_activas: count || 0,
-            capacity: line.capacity,
-            tiempo_promedio,
-            ultima_actualizacion: new Date(line.updated_at).toLocaleString("es-ES"),
-          };
-        })
-      );
-
-      setLineas(lineasStats);
-
-      // Fetch total OFs
-      const { count: totalCount } = await supabase
-        .from("fabrication_orders")
-        .select("id", { count: "exact", head: true })
-        .in("status", ["pendiente", "en_proceso"]);
-
-      setTotalOFs(totalCount || 0);
-
-      // Fetch completed today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      setLoading(true);
       
-      // Consultas separadas por status para evitar error 400
-      const completedTodayPromises = (['completada', 'validada', 'albarana'] as const).map(status =>
-        supabase
-          .from("fabrication_orders")
-          .select("id", { count: "exact", head: true })
-          .eq("status", status)
-          .not("completed_at", "is", null)
-          .gte("completed_at", today.toISOString())
-      );
-      
-      const completedTodayResults = await Promise.all(completedTodayPromises);
-      const completedCount = completedTodayResults.reduce((sum, result) => sum + (result.count || 0), 0);
+      let query = supabase
+        .from('fabrication_orders')
+        .select('*, production_lines(name)')
+        .order('created_at', { ascending: false });
 
-      setCompletadasHoy(completedCount);
-
-      // Fetch active alerts
-      const { count: alertsCount } = await supabase
-        .from("alerts")
-        .select("id", { count: "exact", head: true })
-        .is("resolved_at", null);
-
-      setAlertas(alertsCount || 0);
-
-      // Construir query de OFs con filtros aplicados
-      let ofsQuery = supabase
-        .from("fabrication_orders")
-        .select(`
-          id,
-          sap_id,
-          customer,
-          status,
-          priority,
-          created_at,
-          line_id,
-          production_lines (name)
-        `)
-        .order("created_at", { ascending: false });
-
-      // Aplicar filtros si existen
-      if (filters.status && filters.status !== 'all') {
-        ofsQuery = ofsQuery.eq('status', filters.status as any);
-      }
-      if (filters.lineId && filters.lineId !== 'all') {
-        ofsQuery = ofsQuery.eq('line_id', filters.lineId);
+              if (filters.status !== 'all' && filters.status) {
+        const statusValue = filters.status as 'pendiente' | 'en_proceso' | 'completada' | 'validada' | 'albarana';
+        query = query.eq('status', statusValue);
       }
       if (filters.customer) {
-        ofsQuery = ofsQuery.ilike('customer', `%${filters.customer}%`);
-      }
-      if (filters.dateFrom) {
-        ofsQuery = ofsQuery.gte('created_at', filters.dateFrom);
-      }
-      if (filters.dateTo) {
-        ofsQuery = ofsQuery.lte('created_at', filters.dateTo);
+        query = query.ilike('customer', `%${filters.customer}%`);
       }
 
-      const { data: recentOFsData, error: ofsError } = await ofsQuery.limit(showAllOFs ? 50 : 10);
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      
+      setAllOFs(data || []);
 
-      if (ofsError) throw ofsError;
-      setRecentOFs(recentOFsData || []);
+      // Agrupar por cliente
+      const ordersByCustomer = new Map<string, OrderSummary>();
+      
+      data?.forEach((of: any) => {
+        const customer = of.customer || 'Sin cliente';
+        
+        if (!ordersByCustomer.has(customer)) {
+          ordersByCustomer.set(customer, {
+            customer,
+            total_ofs: 0,
+            completed_ofs: 0,
+            in_progress_ofs: 0,
+            pending_ofs: 0
+          });
+        }
+        
+        const summary = ordersByCustomer.get(customer)!;
+        summary.total_ofs++;
+        
+        if (['completada', 'validada', 'albarana'].includes(of.status)) {
+          summary.completed_ofs++;
+        } else if (of.status === 'en_proceso') {
+          summary.in_progress_ofs++;
+        } else {
+          summary.pending_ofs++;
+        }
+      });
 
-      // Fetch alertas prioritarias (no resueltas, ordenadas por severity)
-      const { data: priorityAlertsData, error: alertsError } = await supabase
-        .from("alerts")
-        .select(`
-          id,
-          title,
-          description,
-          severity,
-          alert_type,
-          created_at,
-          of_id
-        `)
-        .is("resolved_at", null)
-        .order("severity", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      if (alertsError) throw alertsError;
-      setPriorityAlerts(priorityAlertsData || []);
-
+      setOrders(Array.from(ordersByCustomer.values()));
       setLoading(false);
     } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-      toast.error("Error al cargar datos del dashboard");
+      console.error('Error fetching orders:', error);
+      toast.error('Error al cargar órdenes');
       setLoading(false);
     }
   };
 
   const setupRealtimeSubscriptions = () => {
     const channel = supabase
-      .channel("produccion-dashboard")
+      .channel('fabrication-orders-changes')
       .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "production_lines" },
-        () => fetchDashboardData()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "fabrication_orders" },
-        () => fetchDashboardData()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "alerts" },
-        () => fetchDashboardData()
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'fabrication_orders'
+        },
+        () => {
+          fetchOrdersData();
+        }
       )
       .subscribe();
 
@@ -291,544 +116,261 @@ const DashboardProduccion = () => {
     };
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "text-success border-l-4 border-success bg-success/5";
-      case "paused":
-        return "text-warning border-l-4 border-warning bg-warning/5";
-      case "error":
-        return "text-destructive border-l-4 border-destructive bg-destructive/5";
-      default:
-        return "text-muted-foreground";
+  const getStatusVariant = (status: string) => {
+    switch(status) {
+      case 'completada':
+      case 'validada':
+      case 'albarana':
+        return 'default';
+      case 'en_proceso': return 'secondary';
+      case 'pendiente': return 'outline';
+      default: return 'outline';
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "active":
-        return "🟢";
-      case "paused":
-        return "🟡";
-      case "error":
-        return "🔴";
-      default:
-        return "⚪";
-    }
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
   };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "active":
-        return "✓ Funcionando correctamente";
-      case "paused":
-        return "⚠ En progreso - revisar";
-      case "error":
-        return "✗ Crítico - Línea parada";
-      default:
-        return "Estado desconocido";
-    }
-  };
-
-  const getSeverityIcon = (severity: string) => {
-    switch (severity) {
-      case "critical":
-        return "🔴";
-      case "warning":
-        return "🟠";
-      case "info":
-        return "🟡";
-      default:
-        return "⚪";
-    }
-  };
-
-  const produccionData = [
-    { dia: 'L', completadas: 12, pendientes: 5 },
-    { dia: 'M', completadas: 15, pendientes: 3 },
-    { dia: 'X', completadas: 10, pendientes: 7 },
-    { dia: 'J', completadas: 18, pendientes: 2 },
-    { dia: 'V', completadas: 14, pendientes: 4 },
-    { dia: 'S', completadas: 8, pendientes: 6 },
-    { dia: 'Hoy', completadas: completadasHoy, pendientes: totalOFs }
-  ];
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-background p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Dashboard Producción</h1>
-            <p className="text-muted-foreground mt-1">
-              Bienvenido, {user?.email}
-            </p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {hasRole('admin_global') && (
+              <Button variant="ghost" onClick={() => navigate('/dashboard/global')}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Dashboard Global
+              </Button>
+            )}
+            <h1 className="text-3xl font-bold">Dashboard Producción</h1>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => navigate("/dashboard/produccion/alertas")} variant="outline">
-              <AlertTriangle className="mr-2 h-4 w-4" />
-              Alertas ({alertas})
+            <Button variant="outline" onClick={() => navigate("/dashboard/produccion/alertas")}>
+              <Bell className="mr-2 h-4 w-4" />
+              Alertas
             </Button>
-            {hasRole('admin_global') ? (
-              <Button onClick={() => navigate("/")}>Volver al inicio</Button>
-            ) : (
-              <Button variant="outline" onClick={handleSignOut}>Salir</Button>
-            )}
+            <Button variant="outline" onClick={handleSignOut}>
+              Cerrar Sesión
+            </Button>
           </div>
         </div>
 
-        {/* Notificaciones Push */}
-        {permission === 'default' && (
-          <Card className="border-warning">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Bell className="h-5 w-5 text-warning" />
-                  <div>
-                    <h3 className="font-semibold">Activar Notificaciones</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Recibe alertas críticas en tiempo real
-                    </p>
-                  </div>
-                </div>
-                <Button onClick={requestPermission} variant="default">
-                  Activar
-                </Button>
+        {/* Estadísticas generales */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total OFs</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{allOFs.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Completadas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {allOFs.filter(of => ['completada', 'validada', 'albarana'].includes(of.status)).length}
               </div>
             </CardContent>
           </Card>
-        )}
-
-        {/* Botón Dashboard Supervisor */}
-        {(hasRole('admin_global') || hasRole('admin_departamento') || hasRole('supervisor')) && (
-          <Card className="border-blue-200 bg-blue-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Crown className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <h3 className="font-semibold text-blue-900">Dashboard de Supervisor</h3>
-                    <p className="text-sm text-blue-700">
-                      Accede a métricas avanzadas, vista completa de todas las OFs y análisis en tiempo real
-                    </p>
-                  </div>
-                </div>
-                <Button 
-                  onClick={() => navigate('/dashboard/produccion/supervisor')}
-                  variant="default"
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Crown className="mr-2 h-4 w-4" />
-                  Acceder
-                </Button>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">En Proceso</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                {allOFs.filter(of => of.status === 'en_proceso').length}
               </div>
             </CardContent>
           </Card>
-        )}
-
-        {/* Botón Secuenciación */}
-        {(hasRole('admin_global') || hasRole('admin_departamento') || hasRole('supervisor')) && (
-          <Card className="border-green-200 bg-green-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Settings className="h-5 w-5 text-green-600" />
-                  <div>
-                    <h3 className="font-semibold text-green-900">Secuenciación Automatizada</h3>
-                    <p className="text-sm text-green-700">
-                      Optimiza la producción con algoritmos inteligentes y detecta conflictos automáticamente
-                    </p>
-                  </div>
-                </div>
-                <Button 
-                  onClick={() => navigate('/dashboard/produccion/secuenciacion')}
-                  variant="default"
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <Settings className="mr-2 h-4 w-4" />
-                  Secuenciar
-                </Button>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Pendientes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">
+                {allOFs.filter(of => of.status === 'pendiente').length}
               </div>
             </CardContent>
           </Card>
-        )}
+        </div>
 
-        {/* Métricas Globales */}
+        {/* Filtros */}
         <Card>
-          <CardHeader>
-            <CardTitle>Estado del Sistema</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Total OFs activas</p>
-                <p className="text-2xl font-bold text-foreground">{totalOFs}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Líneas OK</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {lineas.filter((l) => l.status === "active").length}/{lineas.length}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Completadas hoy</p>
-                <p className="text-2xl font-bold text-foreground">{completadasHoy}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Alertas</p>
-                <p className="text-2xl font-bold text-destructive">{alertas}</p>
-              </div>
+          <CardContent className="pt-6">
+            <div className="flex gap-4">
+              <Input 
+                placeholder="Buscar cliente..." 
+                value={filters.customer}
+                onChange={(e) => setFilters({...filters, customer: e.target.value})} 
+                className="max-w-xs"
+              />
+              <Select 
+                value={filters.status} 
+                onValueChange={(val) => setFilters({...filters, status: val})}
+              >
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                  <SelectItem value="en_proceso">En Proceso</SelectItem>
+                  <SelectItem value="completada">Completada</SelectItem>
+                  <SelectItem value="validada">Validada</SelectItem>
+                  <SelectItem value="albarana">Albaranada</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
 
-        {/* Tarjetas de Líneas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {lineas.map((linea) => (
-            <Card key={linea.id} className={getStatusColor(linea.status)}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span>{getStatusIcon(linea.status)}</span>
-                  <span>{linea.name}</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <p className="text-sm">
-                    <span className="font-medium">Estado:</span> {getStatusText(linea.status)}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">OFs activas:</span> {linea.ofs_activas}/{linea.capacity}
-                  </p>
-                  
-                  <div>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="font-medium">Ocupación</span>
-                      <span className="font-medium">{Math.round((linea.ofs_activas / linea.capacity) * 100)}%</span>
-                    </div>
-                    <Progress value={(linea.ofs_activas / linea.capacity) * 100} className="h-2" />
-                  </div>
-                  
-                  <p className="text-sm">
-                    <span className="font-medium">Tiempo promedio:</span> {linea.tiempo_promedio}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Última actualización: hace 2 minutos
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    onClick={() => navigate(`/dashboard/produccion/linea/${linea.id}`)}
-                    size="sm"
-                  >
-                    <Map className="mr-2 h-4 w-4" />
-                    Ver Detalles
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setSelectedLineForAssignment(linea.id);
-                      setIsCreateOFModalOpen(true);
-                    }}
-                    variant="default"
-                    size="sm"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Asignar OF
-                  </Button>
-                  <Button
-                    onClick={() => navigate("/dashboard/produccion/alertas")}
-                    variant="outline"
-                    size="sm"
-                  >
-                    <AlertTriangle className="mr-2 h-4 w-4" />
-                    Alertas
-                    {priorityAlerts.filter(a => 
-                      a.related_of_id && recentOFs.find(of => 
-                        of.id === a.related_of_id && of.line_id === linea.id
-                      )
-                    ).length > 0 && (
-                      <Badge variant="destructive" className="ml-2">
-                        {priorityAlerts.filter(a => 
-                          a.related_of_id && recentOFs.find(of => 
-                            of.id === a.related_of_id && of.line_id === linea.id
-                          )
-                        ).length}
-                      </Badge>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Filtros */}
-        <OFFilters 
-          onFilterChange={(f) => {
-            setFilters(f);
-          }}
-          lines={lineas}
-        />
-
-        {/* Tabla de OFs Recientes */}
+        {/* Tabla de Clientes/Pedidos */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Órdenes de Fabricación Recientes</CardTitle>
-              <Button variant="outline" size="sm" onClick={() => setShowAllOFs(!showAllOFs)}>
-                {showAllOFs ? 'Ver menos' : 'Ver todas'}
-              </Button>
-            </div>
+            <CardTitle>Órdenes por Cliente</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID SAP</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Línea</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Prioridad</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentOFs.length === 0 ? (
+            {orders.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No se encontraron órdenes
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      No hay órdenes de fabricación
-                    </TableCell>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Total OFs</TableHead>
+                    <TableHead>Completadas</TableHead>
+                    <TableHead>En Proceso</TableHead>
+                    <TableHead>Pendientes</TableHead>
+                    <TableHead>Progreso</TableHead>
+                    <TableHead>Acciones</TableHead>
                   </TableRow>
-                ) : (
-                  recentOFs.map((of) => (
-                    <TableRow 
-                      key={of.id} 
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => navigate(`/dashboard/produccion/of/${of.id}`)}
-                    >
-                      <TableCell className="font-mono">
-                        #{of.sap_id || of.id.slice(0, 8)}
+                </TableHeader>
+                <TableBody>
+                  {orders.map((order, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="font-bold">{order.customer}</TableCell>
+                      <TableCell>{order.total_ofs}</TableCell>
+                      <TableCell className="text-green-600 font-semibold">
+                        {order.completed_ofs}
                       </TableCell>
-                      <TableCell>{of.customer}</TableCell>
-                      <TableCell>
-                        {of.production_lines ? of.production_lines.name : 'Sin asignar'}
+                      <TableCell className="text-blue-600 font-semibold">
+                        {order.in_progress_ofs}
                       </TableCell>
-                      <TableCell>
-                        <Badge variant={
-                          of.status === 'completada' ? 'default' :
-                          of.status === 'en_proceso' ? 'secondary' :
-                          of.status === 'validada' ? 'outline' :
-                          'outline'
-                        }>
-                          {of.status.replace('_', ' ').toUpperCase()}
-                        </Badge>
+                      <TableCell className="text-orange-600 font-semibold">
+                        {order.pending_ofs}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={of.priority > 5 ? 'destructive' : of.priority > 2 ? 'default' : 'secondary'}>
-                          {of.priority > 5 ? '🔴 ALTA' : of.priority > 2 ? '🟡 NORMAL' : '🟢 BAJA'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(of.created_at).toLocaleDateString('es-ES')}
+                        <div className="w-full max-w-xs">
+                          <Progress 
+                            value={order.total_ofs > 0 ? (order.completed_ofs / order.total_ofs) * 100 : 0} 
+                          />
+                          <span className="text-xs text-muted-foreground mt-1">
+                            {order.total_ofs > 0 
+                              ? Math.round((order.completed_ofs / order.total_ofs) * 100) 
+                              : 0}%
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Button 
                           size="sm" 
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/dashboard/produccion/of/${of.id}`);
+                          onClick={() => {
+                            // Navegar a vista filtrada por cliente
+                            setFilters({...filters, customer: order.customer});
                           }}
                         >
-                          Ver
+                          <Package2 className="mr-2 h-4 w-4" />
+                          Ver OFs
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* Gráfico de Tendencia */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Tendencia de Productividad</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={produccionData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="dia" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="completadas" 
-                  stroke="hsl(var(--success))" 
-                  strokeWidth={2}
-                  name="Completadas"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="pendientes" 
-                  stroke="hsl(var(--warning))" 
-                  strokeWidth={2}
-                  name="Pendientes"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Panel de Alertas Prioritarias */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>⚠️ Alertas Prioritarias</CardTitle>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => navigate('/dashboard/produccion/alertas')}
-              >
-                Ver Todas ({alertas})
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {priorityAlerts.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">
-                ✅ No hay alertas activas
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {priorityAlerts.map((alert) => (
-                  <Card 
-                    key={alert.id} 
-                    className={`p-3 cursor-pointer hover:bg-muted/50 border-l-4 ${
-                      alert.severity === 5 ? 'border-destructive' :
-                      alert.severity === 4 ? 'border-warning' :
-                      'border-blue-500'
-                    }`}
-                    onClick={() => navigate('/dashboard/produccion/alertas')}
-                  >
-                    <div className="flex items-start gap-2">
-                      <span className="text-xl">
-                        {alert.severity === 5 ? '🔴' :
-                         alert.severity === 4 ? '🟡' : '🔵'}
-                      </span>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{alert.title}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {new Date(alert.created_at).toLocaleString('es-ES')} • {alert.alert_type?.replace('_', ' ').toUpperCase()}
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
 
-        {/* Acciones Rápidas */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Acciones Rápidas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Button className="h-auto py-4" onClick={() => setIsCreateOFModalOpen(true)}>
-                <Plus className="mr-2 h-5 w-5" />
-                Nueva OF
-              </Button>
-              <Button 
-                className="h-auto py-4" 
-                variant="outline"
-                onClick={() => navigate("/dashboard/produccion/registro")}
-              >
-                <ClipboardList className="mr-2 h-5 w-5" />
-                Registro Digital
-              </Button>
-              <Button className="h-auto py-4" variant="outline" onClick={() => navigate("/dashboard/produccion/alertas")}>
-                <AlertTriangle className="mr-2 h-5 w-5" />
-                Ver Alertas
-              </Button>
-              <Button 
-                className="h-auto py-4" 
-                variant="outline"
-                onClick={() => setIsCredentialsModalOpen(true)}
-              >
-                <Key className="mr-2 h-5 w-5" />
-                Generar Credenciales
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Panel de Supervisor y Secuenciación - Solo para admin_global, admin_departamento, supervisor */}
-        {(isAdmin || hasRole('admin_departamento') || hasRole('supervisor')) && (
+        {/* Lista de OFs (cuando hay filtro de cliente) */}
+        {filters.customer && allOFs.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Crown className="h-5 w-5" />
-                Panel de Supervisión
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Órdenes de Fabricación - {filters.customer}</CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setFilters({...filters, customer: ''})}
+                >
+                  Limpiar filtro
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <Button
-                onClick={() => navigate('/dashboard/produccion/supervisor')}
-                className="w-full"
-                variant="outline"
-              >
-                <Crown className="mr-2 h-4 w-4" />
-                Dashboard Supervisor
-              </Button>
-              <Button
-                onClick={() => navigate('/dashboard/produccion/secuenciacion')}
-                className="w-full"
-              >
-                <Workflow className="mr-2 h-4 w-4" />
-                Secuenciación de Producción
-              </Button>
-              <Button
-                onClick={() => navigate('/dashboard/produccion/naves')}
-                className="w-full"
-                variant="outline"
-              >
-                <Warehouse className="mr-2 h-4 w-4" />
-                Gestión de Naves
-              </Button>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>SAP ID</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Línea</TableHead>
+                    <TableHead>Prioridad</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allOFs.map(of => (
+                    <TableRow key={of.id}>
+                      <TableCell className="font-mono font-bold">
+                        {of.sap_id || 'N/A'}
+                      </TableCell>
+                      <TableCell>{of.customer}</TableCell>
+                      <TableCell>
+                        {of.production_lines?.name || (
+                          <span className="text-muted-foreground">No asignada</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={of.priority > 5 ? 'default' : 'outline'}>
+                          {of.priority || 0}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusVariant(of.status)}>
+                          {of.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          size="sm" 
+                          onClick={() => navigate(`/dashboard/produccion/of/${of.id}`)}
+                        >
+                          Ver Detalle
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         )}
-
-        {/* Modals */}
-        <GenerateCredentialsModal
-          open={isCredentialsModalOpen}
-          onOpenChange={setIsCredentialsModalOpen}
-          users={users}
-        />
-        <CreateOFModal
-          isOpen={isCreateOFModalOpen}
-          onClose={() => {
-            setIsCreateOFModalOpen(false);
-            setSelectedLineForAssignment(null);
-          }}
-          onSuccess={fetchDashboardData}
-        />
       </div>
     </div>
   );
