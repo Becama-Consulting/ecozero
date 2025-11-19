@@ -9,8 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Bell, ArrowLeft, Package2, Package } from "lucide-react";
+import { Loader2, Bell, ArrowLeft, Package2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface OrderSummary {
@@ -21,15 +20,6 @@ interface OrderSummary {
   pending_ofs: number;
 }
 
-interface ConsolidatedMaterial {
-  material_codigo: string;
-  material_descripcion: string;
-  cantidad_total: number;
-  unidad: string;
-  estado: string;
-  ofs_asociadas: string[];
-}
-
 const DashboardProduccion = () => {
   const { user, hasRole, signOut } = useAuth();
   const navigate = useNavigate();
@@ -37,17 +27,9 @@ const DashboardProduccion = () => {
   const [allOFs, setAllOFs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ status: 'all', customer: '' });
-  const [showMaterialModal, setShowMaterialModal] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<string>('');
-  const [consolidatedMaterials, setConsolidatedMaterials] = useState<ConsolidatedMaterial[]>([]);
-  const [processingMaterial, setProcessingMaterial] = useState(false);
 
   useEffect(() => {
-    console.log('🔐 Dashboard mounted - User:', user?.email, 'Filters:', filters);
-    if (!user) {
-      console.warn('⚠️ No user authenticated');
-      return;
-    }
+    if (!user) return;
     // Acceso permitido para: admin_global, admin_departamento, supervisor, operario, quality
     fetchOrdersData();
     setupRealtimeSubscriptions();
@@ -57,13 +39,20 @@ const DashboardProduccion = () => {
     try {
       setLoading(true);
       
-      // Consulta simplificada sin JOIN
+      // PRUEBA DIAGNÓSTICO: Consulta más simple posible
+      console.log('🔍 Iniciando consulta...');
+      const { data: testData, error: testError } = await supabase
+        .from('fabrication_orders')
+        .select('id, customer, status');
+      
+      console.log('🧪 Prueba simple:', { testData, testError, count: testData?.length });
+      
       let query = supabase
         .from('fabrication_orders')
-        .select('*')
+        .select('*, production_lines(name)')
         .order('created_at', { ascending: false });
 
-      if (filters.status !== 'all' && filters.status) {
+              if (filters.status !== 'all' && filters.status) {
         const statusValue = filters.status as 'pendiente' | 'en_proceso' | 'completada' | 'validada' | 'albarana';
         query = query.eq('status', statusValue);
       }
@@ -73,17 +62,7 @@ const DashboardProduccion = () => {
 
       const { data, error } = await query;
       
-      console.log('🔍 Debug - Consulta fabrication_orders:', { 
-        data, 
-        error, 
-        dataLength: data?.length,
-        firstItem: data?.[0]
-      });
-      
-      if (error) {
-        console.error('❌ Error en consulta:', error);
-        throw error;
-      }
+      if (error) throw error;
       
       setAllOFs(data || []);
 
@@ -160,128 +139,6 @@ const DashboardProduccion = () => {
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
-  };
-
-  const prepararMaterialCliente = async (customer: string) => {
-    try {
-      setSelectedCustomer(customer);
-      
-      // Obtener todas las OFs del cliente
-      const { data: ofsCliente, error: ofsError } = await supabase
-        .from('fabrication_orders')
-        .select('id, sap_id, pedido_comercial')
-        .eq('customer', customer);
-      
-      if (ofsError) throw ofsError;
-      
-      if (!ofsCliente || ofsCliente.length === 0) {
-        toast.error('No se encontraron OFs para este cliente');
-        return;
-      }
-      
-      const ofIds = ofsCliente.map(of => of.id);
-      
-      // Consultar materiales de todas las OFs
-      const { data: materiales, error: matError } = await supabase
-        .from('bom_items')
-        .select('*')
-        .in('of_id', ofIds);
-      
-      if (matError) throw matError;
-      
-      if (!materiales || materiales.length === 0) {
-        toast.error('No hay materiales definidos para estas OFs');
-        return;
-      }
-      
-      // Consolidar materiales
-      const materialesMap = new Map();
-      materiales.forEach(mat => {
-        const key = mat.material_codigo;
-        if (materialesMap.has(key)) {
-          const existing = materialesMap.get(key);
-          existing.cantidad_total += mat.cantidad_necesaria;
-          existing.ofs_asociadas.push(mat.of_id);
-        } else {
-          materialesMap.set(key, {
-            material_codigo: mat.material_codigo,
-            material_descripcion: mat.material_descripcion,
-            cantidad_total: mat.cantidad_necesaria,
-            unidad: mat.unidad,
-            estado: mat.estado,
-            ofs_asociadas: [mat.of_id]
-          });
-        }
-      });
-      
-      setConsolidatedMaterials(Array.from(materialesMap.values()));
-      setShowMaterialModal(true);
-    } catch (error) {
-      console.error('Error al preparar materiales:', error);
-      toast.error('Error al consultar materiales');
-    }
-  };
-
-  const confirmarSolicitudMaterial = async () => {
-    try {
-      setProcessingMaterial(true);
-      
-      // Obtener OFs del cliente
-      const { data: ofsCliente, error: ofsError } = await supabase
-        .from('fabrication_orders')
-        .select('id, sap_id, pedido_comercial')
-        .eq('customer', selectedCustomer);
-      
-      if (ofsError) throw ofsError;
-      
-      const ofIds = ofsCliente?.map(of => of.id) || [];
-      const pedidosUnicos = [...new Set(ofsCliente?.map(of => of.pedido_comercial).filter(Boolean))];
-      
-      // Actualizar estado de materiales
-      for (const material of consolidatedMaterials) {
-        await supabase
-          .from('bom_items')
-          .update({ estado: 'solicitado' })
-          .eq('material_codigo', material.material_codigo)
-          .in('of_id', ofIds);
-      }
-      
-      // Actualizar OFs
-      await supabase
-        .from('fabrication_orders')
-        .update({ 
-          material_preparado: true,
-          material_solicitado_at: new Date().toISOString()
-        })
-        .in('id', ofIds);
-      
-      // Enviar webhook a N8N para logística
-      try {
-        await fetch('https://n8n-n8n.wgjrqh.easypanel.host/webhook/solicitud-material-produccion', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cliente: selectedCustomer,
-            pedidos: pedidosUnicos,
-            total_ofs: ofIds.length,
-            materiales: consolidatedMaterials,
-            solicitado_por: user?.email,
-            timestamp: new Date().toISOString()
-          })
-        });
-      } catch (webhookError) {
-        console.warn('Error webhook N8N:', webhookError);
-      }
-      
-      setShowMaterialModal(false);
-      toast.success(`Material solicitado correctamente para ${selectedCustomer}`);
-      fetchOrdersData();
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al solicitar material');
-    } finally {
-      setProcessingMaterial(false);
-    }
   };
 
   if (loading) {
@@ -441,11 +298,13 @@ const DashboardProduccion = () => {
                       <TableCell>
                         <Button 
                           size="sm" 
-                          onClick={() => prepararMaterialCliente(order.customer)}
-                          className="bg-blue-600 hover:bg-blue-700"
+                          onClick={() => {
+                            // Navegar a vista filtrada por cliente
+                            setFilters({...filters, customer: order.customer});
+                          }}
                         >
-                          <Package className="mr-2 h-4 w-4" />
-                          Preparar Material
+                          <Package2 className="mr-2 h-4 w-4" />
+                          Ver OFs
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -520,76 +379,6 @@ const DashboardProduccion = () => {
             </CardContent>
           </Card>
         )}
-
-        {/* Modal de Materiales */}
-        <Dialog open={showMaterialModal} onOpenChange={setShowMaterialModal}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Materiales a Solicitar - {selectedCustomer}</DialogTitle>
-              <DialogDescription>
-                Lista consolidada de materiales para todas las OFs del cliente
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Código</TableHead>
-                    <TableHead>Descripción</TableHead>
-                    <TableHead>Cantidad Total</TableHead>
-                    <TableHead>Unidad</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead># OFs</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {consolidatedMaterials.map(mat => (
-                    <TableRow key={mat.material_codigo}>
-                      <TableCell className="font-mono font-bold">{mat.material_codigo}</TableCell>
-                      <TableCell>{mat.material_descripcion}</TableCell>
-                      <TableCell className="font-bold text-lg">{mat.cantidad_total}</TableCell>
-                      <TableCell>{mat.unidad}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{mat.estado}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge>{mat.ofs_asociadas.length}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={() => setShowMaterialModal(false)}
-                disabled={processingMaterial}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                onClick={confirmarSolicitudMaterial}
-                disabled={processingMaterial}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                {processingMaterial ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Solicitando...
-                  </>
-                ) : (
-                  <>
-                    <Package className="mr-2 h-4 w-4" />
-                    Solicitar a Logística
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </div>
   );
