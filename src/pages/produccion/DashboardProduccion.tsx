@@ -433,11 +433,10 @@ const DashboardProduccion = () => {
                       <TableCell>
                         <Button 
                           size="sm" 
-                          onClick={() => prepararMaterialCliente(order.customer)}
-                          className="bg-blue-600 hover:bg-blue-700"
+                          onClick={() => setFilters({...filters, customer: order.customer})}
                         >
-                          <Package className="mr-2 h-4 w-4" />
-                          Preparar Material
+                          <Package2 className="mr-2 h-4 w-4" />
+                          Ver OFs
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -454,13 +453,23 @@ const DashboardProduccion = () => {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Órdenes de Fabricación - {filters.customer}</CardTitle>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setFilters({...filters, customer: ''})}
-                >
-                  Limpiar filtro
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm"
+                    onClick={() => prepararMaterialCliente(filters.customer)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Package className="mr-2 h-4 w-4" />
+                    Preparar Material
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setFilters({...filters, customer: ''})}
+                  >
+                    Limpiar filtro
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
