@@ -1,304 +1,387 @@
--- FASE 0: FUNDACIÓN - EcoCero MVP
--- Sistema de roles de 3 niveles + Tablas core de Producción
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
 
--- 1. ENUM para roles
-CREATE TYPE public.app_role AS ENUM ('admin_global', 'admin_departamento', 'supervisor', 'operario', 'quality');
-
--- 2. ENUM para departamentos
-CREATE TYPE public.departamento AS ENUM ('produccion', 'logistica', 'compras', 'rrhh', 'comercial', 'administrativo');
-
--- 3. ENUM para estados
-CREATE TYPE public.of_status AS ENUM ('pendiente', 'en_proceso', 'completada', 'validada', 'albarana');
-CREATE TYPE public.step_status AS ENUM ('pendiente', 'en_proceso', 'completado', 'error');
-CREATE TYPE public.line_status AS ENUM ('active', 'paused', 'error');
-CREATE TYPE public.alert_severity AS ENUM ('info', 'warning', 'critical');
-
--- 4. Tabla de perfiles (sincronizada con auth.users)
-CREATE TABLE public.profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT NOT NULL,
-  name TEXT NOT NULL,
-  departamento departamento,
-  line_id UUID,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+CREATE TABLE public.absences (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  employee_id uuid NOT NULL,
+  type text NOT NULL,
+  absence_type text DEFAULT 'vacaciones'::text,
+  start_date date NOT NULL,
+  end_date date NOT NULL,
+  total_days integer,
+  status text DEFAULT 'pendiente'::text,
+  reason text,
+  document_url text,
+  document_validated boolean DEFAULT false,
+  document_ai_check jsonb,
+  ai_validated_at timestamp with time zone,
+  approved_by uuid,
+  approved_at timestamp with time zone,
+  rejection_reason text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT absences_pkey PRIMARY KEY (id),
+  CONSTRAINT absences_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(id)
 );
-
--- 5. Tabla de roles (separada por seguridad)
-CREATE TABLE public.user_roles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  role app_role NOT NULL,
-  UNIQUE(user_id, role)
-);
-
--- 6. Líneas de producción
-CREATE TABLE public.production_lines (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL UNIQUE,
-  capacity INTEGER NOT NULL DEFAULT 8,
-  status line_status NOT NULL DEFAULT 'active',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- 7. Órdenes de Fabricación
-CREATE TABLE public.fabrication_orders (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sap_id TEXT UNIQUE,
-  customer TEXT NOT NULL,
-  line_id UUID REFERENCES public.production_lines(id),
-  status of_status NOT NULL DEFAULT 'pendiente',
-  priority INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  started_at TIMESTAMPTZ,
-  completed_at TIMESTAMPTZ,
-  supervisor_id UUID REFERENCES auth.users(id),
-  assignee_id UUID REFERENCES auth.users(id),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- 8. Pasos de producción
-CREATE TABLE public.production_steps (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  of_id UUID NOT NULL REFERENCES public.fabrication_orders(id) ON DELETE CASCADE,
-  step_number INTEGER NOT NULL,
-  step_name TEXT NOT NULL,
-  status step_status NOT NULL DEFAULT 'pendiente',
-  data_json JSONB DEFAULT '{}'::jsonb,
-  photos TEXT[] DEFAULT ARRAY[]::TEXT[],
-  started_at TIMESTAMPTZ,
-  completed_at TIMESTAMPTZ,
-  assigned_to UUID REFERENCES auth.users(id),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE(of_id, step_number)
-);
-
--- 9. Alertas
-CREATE TABLE public.alerts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  type TEXT NOT NULL,
-  severity alert_severity NOT NULL DEFAULT 'info',
-  message TEXT NOT NULL,
-  related_of_id UUID REFERENCES public.fabrication_orders(id),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  resolved_at TIMESTAMPTZ,
-  resolved_by UUID REFERENCES auth.users(id)
-);
-
--- 10. Log de actividad (auditoría)
 CREATE TABLE public.activity_log (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id),
-  action TEXT NOT NULL,
-  table_name TEXT NOT NULL,
-  record_id UUID,
-  old_values JSONB,
-  new_values JSONB,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  action text NOT NULL,
+  table_name text,
+  record_id uuid,
+  old_values jsonb,
+  new_values jsonb,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT activity_log_pkey PRIMARY KEY (id),
+  CONSTRAINT activity_log_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
-
--- Enable Row Level Security
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.production_lines ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.fabrication_orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.production_steps ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.alerts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.activity_log ENABLE ROW LEVEL SECURITY;
-
--- Función de seguridad para verificar roles
-CREATE OR REPLACE FUNCTION public.has_role(_user_id UUID, _role app_role)
-RETURNS BOOLEAN
-LANGUAGE SQL
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.user_roles
-    WHERE user_id = _user_id AND role = _role
-  )
-$$;
-
--- Función de seguridad para verificar si es admin (global o departamento)
-CREATE OR REPLACE FUNCTION public.is_admin(_user_id UUID)
-RETURNS BOOLEAN
-LANGUAGE SQL
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.user_roles
-    WHERE user_id = _user_id 
-    AND role IN ('admin_global', 'admin_departamento')
-  )
-$$;
-
--- RLS POLICIES
-
--- Profiles: todos ven todos, solo admins editan
-CREATE POLICY "Profiles are viewable by everyone" 
-  ON public.profiles FOR SELECT 
-  USING (true);
-
-CREATE POLICY "Users can update their own profile" 
-  ON public.profiles FOR UPDATE 
-  USING (auth.uid() = id);
-
-CREATE POLICY "Admins can update any profile" 
-  ON public.profiles FOR UPDATE 
-  USING (public.is_admin(auth.uid()));
-
-CREATE POLICY "Admins can insert profiles" 
-  ON public.profiles FOR INSERT 
-  WITH CHECK (public.is_admin(auth.uid()));
-
--- User roles: solo admins pueden ver/modificar
-CREATE POLICY "Admins can view all roles" 
-  ON public.user_roles FOR SELECT 
-  USING (public.is_admin(auth.uid()));
-
-CREATE POLICY "Admins can insert roles" 
-  ON public.user_roles FOR INSERT 
-  WITH CHECK (public.is_admin(auth.uid()));
-
-CREATE POLICY "Admins can update roles" 
-  ON public.user_roles FOR UPDATE 
-  USING (public.is_admin(auth.uid()));
-
-CREATE POLICY "Admins can delete roles" 
-  ON public.user_roles FOR DELETE 
-  USING (public.is_admin(auth.uid()));
-
--- Production lines: todos ven, solo admins editan
-CREATE POLICY "Lines are viewable by authenticated users" 
-  ON public.production_lines FOR SELECT 
-  USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Admins can manage lines" 
-  ON public.production_lines FOR ALL 
-  USING (public.is_admin(auth.uid()));
-
--- Fabrication orders: todos ven, supervisores y admins editan
-CREATE POLICY "OFs are viewable by authenticated users" 
-  ON public.fabrication_orders FOR SELECT 
-  USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Admins and supervisors can insert OFs" 
-  ON public.fabrication_orders FOR INSERT 
-  WITH CHECK (
-    public.is_admin(auth.uid()) OR 
-    public.has_role(auth.uid(), 'supervisor')
-  );
-
-CREATE POLICY "Admins and supervisors can update OFs" 
-  ON public.fabrication_orders FOR UPDATE 
-  USING (
-    public.is_admin(auth.uid()) OR 
-    public.has_role(auth.uid(), 'supervisor')
-  );
-
--- Production steps: todos ven, operarios editan los suyos, supervisores todos
-CREATE POLICY "Steps are viewable by authenticated users" 
-  ON public.production_steps FOR SELECT 
-  USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Operarios can update their assigned steps" 
-  ON public.production_steps FOR UPDATE 
-  USING (
-    assigned_to = auth.uid() OR 
-    public.is_admin(auth.uid()) OR 
-    public.has_role(auth.uid(), 'supervisor')
-  );
-
-CREATE POLICY "Supervisors can insert steps" 
-  ON public.production_steps FOR INSERT 
-  WITH CHECK (
-    public.is_admin(auth.uid()) OR 
-    public.has_role(auth.uid(), 'supervisor')
-  );
-
--- Alerts: todos ven, todos pueden crear
-CREATE POLICY "Alerts are viewable by authenticated users" 
-  ON public.alerts FOR SELECT 
-  USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can create alerts" 
-  ON public.alerts FOR INSERT 
-  WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Admins and supervisors can resolve alerts" 
-  ON public.alerts FOR UPDATE 
-  USING (
-    public.is_admin(auth.uid()) OR 
-    public.has_role(auth.uid(), 'supervisor')
-  );
-
--- Activity log: solo lectura para admins
-CREATE POLICY "Admins can view activity log" 
-  ON public.activity_log FOR SELECT 
-  USING (public.is_admin(auth.uid()));
-
-CREATE POLICY "System can insert activity log" 
-  ON public.activity_log FOR INSERT 
-  WITH CHECK (true);
-
--- Trigger para crear perfil automáticamente al registrar usuario
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email, name)
-  VALUES (
-    new.id,
-    new.email,
-    COALESCE(new.raw_user_meta_data->>'name', new.email)
-  );
-  RETURN new;
-END;
-$$;
-
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- Trigger para actualizar updated_at
-CREATE OR REPLACE FUNCTION public.update_updated_at_column()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER update_profiles_updated_at
-  BEFORE UPDATE ON public.profiles
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
-CREATE TRIGGER update_production_lines_updated_at
-  BEFORE UPDATE ON public.production_lines
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
-CREATE TRIGGER update_fabrication_orders_updated_at
-  BEFORE UPDATE ON public.fabrication_orders
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
--- Insertar líneas de producción iniciales
-INSERT INTO public.production_lines (name, capacity, status) VALUES
-  ('ECONORDIK', 8, 'active'),
-  ('QUADRILATERAL', 8, 'active');
-
--- Enable realtime para actualizaciones en tiempo real
-ALTER PUBLICATION supabase_realtime ADD TABLE public.fabrication_orders;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.production_steps;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.alerts;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.production_lines;
+CREATE TABLE public.alerts (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text,
+  line_id uuid,
+  of_id uuid,
+  resolved boolean NOT NULL DEFAULT false,
+  resolved_by uuid,
+  resolved_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  assigned_to uuid,
+  assigned_at timestamp with time zone,
+  message text NOT NULL,
+  type text,
+  alert_type text,
+  severity integer CHECK (severity >= 1 AND severity <= 5),
+  CONSTRAINT alerts_pkey PRIMARY KEY (id),
+  CONSTRAINT alerts_line_id_fkey FOREIGN KEY (line_id) REFERENCES public.production_lines(id),
+  CONSTRAINT alerts_of_id_fkey FOREIGN KEY (of_id) REFERENCES public.fabrication_orders(id),
+  CONSTRAINT alerts_resolved_by_fkey FOREIGN KEY (resolved_by) REFERENCES auth.users(id),
+  CONSTRAINT alerts_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES auth.users(id)
+);
+CREATE TABLE public.attendance (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  employee_id uuid NOT NULL,
+  date date NOT NULL,
+  check_in timestamp with time zone,
+  check_out timestamp with time zone,
+  status text DEFAULT 'pendiente'::text,
+  notes text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT attendance_pkey PRIMARY KEY (id),
+  CONSTRAINT attendance_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(id)
+);
+CREATE TABLE public.bom_items (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  of_id uuid,
+  sap_material_id text,
+  material_codigo text NOT NULL,
+  material_descripcion text NOT NULL,
+  cantidad_necesaria numeric NOT NULL,
+  unidad text DEFAULT 'unidades'::text,
+  cantidad_recibida numeric DEFAULT 0,
+  estado text DEFAULT 'pendiente'::text,
+  ubicacion_almacen text,
+  lote text,
+  notas text,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT bom_items_pkey PRIMARY KEY (id),
+  CONSTRAINT bom_items_of_id_fkey FOREIGN KEY (of_id) REFERENCES public.fabrication_orders(id)
+);
+CREATE TABLE public.employee_documents (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  employee_id uuid NOT NULL,
+  document_type text NOT NULL,
+  document_name text,
+  file_url text NOT NULL,
+  file_type text,
+  file_size integer,
+  issue_date date,
+  expiry_date date,
+  required boolean DEFAULT false,
+  status text DEFAULT 'entregado'::text,
+  verified boolean DEFAULT false,
+  verified_by uuid,
+  verified_at timestamp with time zone,
+  validated_at timestamp with time zone,
+  uploaded_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT employee_documents_pkey PRIMARY KEY (id),
+  CONSTRAINT employee_documents_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(id)
+);
+CREATE TABLE public.employees (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  employee_code text NOT NULL UNIQUE,
+  full_name text NOT NULL,
+  dni text NOT NULL UNIQUE,
+  email text NOT NULL UNIQUE,
+  phone text,
+  position text NOT NULL,
+  department text NOT NULL,
+  contract_type text NOT NULL,
+  hire_date date NOT NULL,
+  termination_date date,
+  active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT employees_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.ett_employees (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  employee_id uuid,
+  agency text NOT NULL,
+  contract_start date NOT NULL,
+  contract_end date,
+  hourly_rate numeric NOT NULL,
+  active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT ett_employees_pkey PRIMARY KEY (id),
+  CONSTRAINT ett_employees_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(id)
+);
+CREATE TABLE public.ett_invoices (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  agency text NOT NULL,
+  invoice_number text NOT NULL UNIQUE,
+  invoice_date date NOT NULL,
+  period_start date NOT NULL,
+  period_end date NOT NULL,
+  total_amount numeric NOT NULL,
+  file_url text NOT NULL,
+  file_size integer,
+  extracted_data jsonb,
+  validated boolean DEFAULT false,
+  discrepancies jsonb DEFAULT '[]'::jsonb,
+  validated_by uuid,
+  validated_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT ett_invoices_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.fabrication_orders (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  sap_id text UNIQUE,
+  customer text NOT NULL,
+  line_id uuid,
+  supervisor_id uuid,
+  assignee_id uuid,
+  start_date date,
+  end_date date,
+  priority integer DEFAULT 0,
+  status USER-DEFINED NOT NULL DEFAULT 'pendiente'::of_status,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  quality_validated boolean,
+  warehouse_id uuid,
+  almacen text DEFAULT 'NAVE_1'::text,
+  material_preparado boolean DEFAULT false,
+  avance_porcentaje numeric DEFAULT 0,
+  material_solicitado_at timestamp without time zone,
+  started_at timestamp without time zone,
+  completed_at timestamp without time zone,
+  validated_at timestamp without time zone,
+  operarios_asignados ARRAY,
+  producto_codigo text,
+  producto_descripcion text,
+  cantidad numeric DEFAULT 1,
+  unidad text DEFAULT 'unidades'::text,
+  pedido_comercial text,
+  oferta_comercial text,
+  referencia_proyecto text,
+  fecha_entrega_comprometida date,
+  propietario_comercial text,
+  numero_albaran text,
+  fecha_albaran date,
+  estado_sap text,
+  fecha_creacion_pedido date,
+  CONSTRAINT fabrication_orders_pkey PRIMARY KEY (id),
+  CONSTRAINT fabrication_orders_line_id_fkey FOREIGN KEY (line_id) REFERENCES public.production_lines(id),
+  CONSTRAINT fabrication_orders_supervisor_id_fkey FOREIGN KEY (supervisor_id) REFERENCES auth.users(id),
+  CONSTRAINT fabrication_orders_assignee_id_fkey FOREIGN KEY (assignee_id) REFERENCES auth.users(id),
+  CONSTRAINT fabrication_orders_warehouse_id_fkey FOREIGN KEY (warehouse_id) REFERENCES public.warehouses(id)
+);
+CREATE TABLE public.of_etapas (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  of_id uuid,
+  nombre text NOT NULL,
+  orden integer NOT NULL,
+  descripcion text,
+  estado text DEFAULT 'pendiente'::text,
+  duracion_estimada integer,
+  duracion_real integer,
+  started_at timestamp without time zone,
+  completed_at timestamp without time zone,
+  operario_id uuid,
+  notas text,
+  documentos_soporte jsonb,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  material_codigo text,
+  cantidad_emitida numeric DEFAULT 0,
+  cantidad_fabricada numeric DEFAULT 0,
+  cantidad_fabricada_acumulada numeric DEFAULT 0,
+  estado_sap text DEFAULT 'O'::text,
+  CONSTRAINT of_etapas_pkey PRIMARY KEY (id),
+  CONSTRAINT of_etapas_of_id_fkey FOREIGN KEY (of_id) REFERENCES public.fabrication_orders(id),
+  CONSTRAINT of_etapas_operario_id_fkey FOREIGN KEY (operario_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.of_history (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  of_id uuid NOT NULL,
+  action text NOT NULL,
+  old_value text,
+  new_value text,
+  changed_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT of_history_pkey PRIMARY KEY (id),
+  CONSTRAINT of_history_of_id_fkey FOREIGN KEY (of_id) REFERENCES public.fabrication_orders(id),
+  CONSTRAINT of_history_changed_by_fkey FOREIGN KEY (changed_by) REFERENCES auth.users(id)
+);
+CREATE TABLE public.payroll (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  employee_id uuid NOT NULL,
+  period text NOT NULL,
+  base_salary numeric DEFAULT 0,
+  extras numeric DEFAULT 0,
+  bonuses numeric DEFAULT 0,
+  deductions numeric DEFAULT 0,
+  gross_salary numeric DEFAULT 0,
+  net_salary numeric DEFAULT 0,
+  status text DEFAULT 'borrador'::text,
+  has_discrepancies boolean DEFAULT false,
+  discrepancies jsonb DEFAULT '[]'::jsonb,
+  advisor_data jsonb,
+  internal_data jsonb,
+  validated_by uuid,
+  validated_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT payroll_pkey PRIMARY KEY (id),
+  CONSTRAINT payroll_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(id)
+);
+CREATE TABLE public.planificacion (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  of_id uuid,
+  secuencia integer NOT NULL,
+  fecha_inicio_planificada timestamp without time zone,
+  fecha_fin_planificada timestamp without time zone,
+  prioridad_custom text,
+  notas_planificacion text,
+  creado_por uuid,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT planificacion_pkey PRIMARY KEY (id),
+  CONSTRAINT planificacion_of_id_fkey FOREIGN KEY (of_id) REFERENCES public.fabrication_orders(id),
+  CONSTRAINT planificacion_creado_por_fkey FOREIGN KEY (creado_por) REFERENCES auth.users(id)
+);
+CREATE TABLE public.production_lines (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  capacity integer NOT NULL DEFAULT 8,
+  status USER-DEFINED NOT NULL DEFAULT 'active'::line_status,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT production_lines_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.production_photos (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  step_id uuid NOT NULL,
+  url text NOT NULL,
+  uploaded_at timestamp with time zone DEFAULT now(),
+  uploaded_by uuid,
+  validated boolean,
+  validation_comment text,
+  validated_by uuid,
+  validated_at timestamp with time zone,
+  CONSTRAINT production_photos_pkey PRIMARY KEY (id),
+  CONSTRAINT production_photos_step_id_fkey FOREIGN KEY (step_id) REFERENCES public.production_steps(id),
+  CONSTRAINT production_photos_uploaded_by_fkey FOREIGN KEY (uploaded_by) REFERENCES auth.users(id),
+  CONSTRAINT production_photos_validated_by_fkey FOREIGN KEY (validated_by) REFERENCES auth.users(id)
+);
+CREATE TABLE public.production_steps (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  of_id uuid NOT NULL,
+  step_number integer NOT NULL,
+  description text NOT NULL,
+  assigned_to uuid,
+  status USER-DEFINED NOT NULL DEFAULT 'pendiente'::step_status,
+  photo_url text,
+  completed_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT production_steps_pkey PRIMARY KEY (id),
+  CONSTRAINT production_steps_of_id_fkey FOREIGN KEY (of_id) REFERENCES public.fabrication_orders(id),
+  CONSTRAINT production_steps_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES auth.users(id)
+);
+CREATE TABLE public.profiles (
+  id uuid NOT NULL,
+  email text NOT NULL,
+  name text NOT NULL,
+  departamento USER-DEFINED,
+  line_id uuid,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.shifts (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  employee_id uuid NOT NULL,
+  date date NOT NULL,
+  shift_type text NOT NULL,
+  start_time time without time zone NOT NULL,
+  end_time time without time zone NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT shifts_pkey PRIMARY KEY (id),
+  CONSTRAINT shifts_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(id)
+);
+CREATE TABLE public.sync_log (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  event_type text NOT NULL,
+  webhook_url text,
+  payload jsonb,
+  response jsonb,
+  status text CHECK (status = ANY (ARRAY['success'::text, 'error'::text, 'pending'::text])),
+  error_message text,
+  retry_count integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT sync_log_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.user_roles (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  role USER-DEFINED NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT user_roles_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.warehouse_assignments (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  of_id uuid NOT NULL,
+  warehouse_id uuid NOT NULL,
+  assigned_at timestamp with time zone NOT NULL DEFAULT now(),
+  assigned_by uuid,
+  priority integer DEFAULT 0,
+  material_type text,
+  estimated_duration_hours integer,
+  status text NOT NULL DEFAULT 'pending'::text,
+  completed_at timestamp with time zone,
+  notes text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT warehouse_assignments_pkey PRIMARY KEY (id),
+  CONSTRAINT warehouse_assignments_of_id_fkey FOREIGN KEY (of_id) REFERENCES public.fabrication_orders(id),
+  CONSTRAINT warehouse_assignments_warehouse_id_fkey FOREIGN KEY (warehouse_id) REFERENCES public.warehouses(id)
+);
+CREATE TABLE public.warehouses (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  type text NOT NULL DEFAULT 'corte'::text,
+  capacity integer NOT NULL DEFAULT 10,
+  current_occupancy integer NOT NULL DEFAULT 0,
+  status text NOT NULL DEFAULT 'active'::text,
+  location text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT warehouses_pkey PRIMARY KEY (id)
+);

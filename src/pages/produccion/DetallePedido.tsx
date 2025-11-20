@@ -171,26 +171,10 @@ const DetallePedido = () => {
       setProcessingMaterial(true);
       const ofIds = ofs.map(of => of.id);
       
-      // Actualizar materiales
-      for (const material of consolidatedMaterials) {
-        await supabase
-          .from('bom_items')
-          .update({ estado: 'solicitado' })
-          .eq('material_codigo', material.material_codigo)
-          .in('of_id', ofIds);
-      }
-
-      // Actualizar OFs - solo marcar material como preparado
-      await supabase
-        .from('fabrication_orders')
-        .update({ 
-          material_preparado: true
-        })
-        .in('id', ofIds);
-
-      // Enviar webhook N8N
+      // Enviar webhook N8N PRIMERO
+      let webhookSuccess = false;
       try {
-        await fetch('https://n8n-n8n.wgjrqh.easypanel.host/webhook/solicitud-material-produccion', {
+        const response = await fetch('https://n8n-n8n.wgjrqh.easypanel.host/webhook/solicitud-material-produccion', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -202,9 +186,37 @@ const DetallePedido = () => {
             timestamp: new Date().toISOString()
           })
         });
+        
+        if (response.ok) {
+          webhookSuccess = true;
+        } else {
+          throw new Error(`Webhook respondió con status ${response.status}`);
+        }
       } catch (webhookError) {
-        console.warn('Error webhook N8N:', webhookError);
-        // No bloqueamos la operación si falla el webhook
+        console.error('Error webhook N8N:', webhookError);
+        toast.error('Error al enviar solicitud a logística. Por favor, inténtalo de nuevo.');
+        setProcessingMaterial(false);
+        return; // Salir sin actualizar nada
+      }
+
+      // Solo si el webhook fue exitoso, actualizar datos
+      if (webhookSuccess) {
+        // Actualizar materiales
+        for (const material of consolidatedMaterials) {
+          await supabase
+            .from('bom_items')
+            .update({ estado: 'solicitado' })
+            .eq('material_codigo', material.material_codigo)
+            .in('of_id', ofIds);
+        }
+
+        // Actualizar OFs
+        await supabase
+          .from('fabrication_orders')
+          .update({ 
+            material_preparado: true
+          })
+          .in('id', ofIds);
       }
 
       setShowMaterialModal(false);
