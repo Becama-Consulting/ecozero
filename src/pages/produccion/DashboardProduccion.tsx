@@ -9,25 +9,17 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Bell, ArrowLeft, Package2, Package } from "lucide-react";
+import { Loader2, Bell, ArrowLeft, Package2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface OrderSummary {
+  pedido_comercial: string;
   customer: string;
+  fecha_creacion: string;
   total_ofs: number;
   completed_ofs: number;
   in_progress_ofs: number;
   pending_ofs: number;
-}
-
-interface ConsolidatedMaterial {
-  material_codigo: string;
-  material_descripcion: string;
-  cantidad_total: number;
-  unidad: string;
-  estado: string;
-  ofs_asociadas: string[];
 }
 
 const DashboardProduccion = () => {
@@ -36,11 +28,15 @@ const DashboardProduccion = () => {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [allOFs, setAllOFs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ status: 'all', customer: '' });
-  const [showMaterialModal, setShowMaterialModal] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<string>('');
-  const [consolidatedMaterials, setConsolidatedMaterials] = useState<ConsolidatedMaterial[]>([]);
-  const [processingMaterial, setProcessingMaterial] = useState(false);
+  const [filters, setFilters] = useState({ 
+    status: 'all', 
+    customer: '', 
+    line: 'all',
+    pedido: '',
+    fecha_desde: '',
+    fecha_hasta: ''
+  });
+  const [productionLines, setProductionLines] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -54,11 +50,12 @@ const DashboardProduccion = () => {
       setLoading(true);
       
       // Obtener líneas de producción primero
-      const { data: productionLines } = await supabase
+      const { data: productionLinesData } = await supabase
         .from('production_lines')
         .select('id, name');
       
-      const linesMap = new Map(productionLines?.map(line => [line.id, line.name]));
+      setProductionLines(productionLinesData || []);
+      const linesMap = new Map(productionLinesData?.map(line => [line.id, line.name]));
       
       // Consulta de OFs sin JOIN
       let query = supabase
@@ -66,12 +63,28 @@ const DashboardProduccion = () => {
         .select('*')
         .order('created_at', { ascending: false });
 
-              if (filters.status !== 'all' && filters.status) {
+      if (filters.status !== 'all' && filters.status) {
         const statusValue = filters.status as 'pendiente' | 'en_proceso' | 'completada' | 'validada' | 'albarana';
         query = query.eq('status', statusValue);
       }
       if (filters.customer) {
         query = query.ilike('customer', `%${filters.customer}%`);
+      }
+      if (filters.pedido) {
+        query = query.ilike('pedido_comercial', `%${filters.pedido}%`);
+      }
+      if (filters.fecha_desde) {
+        query = query.gte('fecha_creacion_pedido', filters.fecha_desde);
+      }
+      if (filters.fecha_hasta) {
+        query = query.lte('fecha_creacion_pedido', filters.fecha_hasta);
+      }
+      if (filters.line !== 'all') {
+        if (filters.line === 'sin_asignar') {
+          query = query.is('line_id', null);
+        } else {
+          query = query.eq('line_id', filters.line);
+        }
       }
 
       const { data, error } = await query;
@@ -86,15 +99,17 @@ const DashboardProduccion = () => {
       
       setAllOFs(dataWithLines || []);
 
-      // Agrupar por cliente
-      const ordersByCustomer = new Map<string, OrderSummary>();
+      // Agrupar por PEDIDO COMERCIAL (no por cliente)
+      const ordersByPedido = new Map<string, OrderSummary>();
       
       data?.forEach((of: any) => {
-        const customer = of.customer || 'Sin cliente';
+        const pedido = of.pedido_comercial || 'Sin pedido';
         
-        if (!ordersByCustomer.has(customer)) {
-          ordersByCustomer.set(customer, {
-            customer,
+        if (!ordersByPedido.has(pedido)) {
+          ordersByPedido.set(pedido, {
+            pedido_comercial: pedido,
+            customer: of.customer || 'Sin cliente',
+            fecha_creacion: of.fecha_creacion_pedido || of.created_at,
             total_ofs: 0,
             completed_ofs: 0,
             in_progress_ofs: 0,
@@ -102,7 +117,7 @@ const DashboardProduccion = () => {
           });
         }
         
-        const summary = ordersByCustomer.get(customer)!;
+        const summary = ordersByPedido.get(pedido)!;
         summary.total_ofs++;
         
         if (['completada', 'validada', 'albarana'].includes(of.status)) {
@@ -114,7 +129,10 @@ const DashboardProduccion = () => {
         }
       });
 
-      setOrders(Array.from(ordersByCustomer.values()));
+      setOrders(Array.from(ordersByPedido.values()).sort((a, b) => {
+        // Ordenar por fecha de creación (más recientes primero)
+        return new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime();
+      }));
       setLoading(false);
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -159,121 +177,6 @@ const DashboardProduccion = () => {
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
-  };
-
-  const prepararMaterialCliente = async (customer: string) => {
-    try {
-      setSelectedCustomer(customer);
-      
-      const { data: ofsCliente, error: ofsError } = await supabase
-        .from('fabrication_orders')
-        .select('id, sap_id, pedido_comercial')
-        .eq('customer', customer);
-      
-      if (ofsError) throw ofsError;
-      
-      if (!ofsCliente || ofsCliente.length === 0) {
-        toast.error('No se encontraron OFs para este cliente');
-        return;
-      }
-      
-      const ofIds = ofsCliente.map(of => of.id);
-      
-      const { data: materiales, error: matError } = await supabase
-        .from('bom_items')
-        .select('*')
-        .in('of_id', ofIds);
-      
-      if (matError) throw matError;
-      
-      if (!materiales || materiales.length === 0) {
-        toast.error('No hay materiales definidos para estas OFs');
-        return;
-      }
-      
-      const materialesMap = new Map();
-      materiales.forEach(mat => {
-        const key = mat.material_codigo;
-        if (materialesMap.has(key)) {
-          const existing = materialesMap.get(key);
-          existing.cantidad_total += mat.cantidad_necesaria;
-          existing.ofs_asociadas.push(mat.of_id);
-        } else {
-          materialesMap.set(key, {
-            material_codigo: mat.material_codigo,
-            material_descripcion: mat.material_descripcion,
-            cantidad_total: mat.cantidad_necesaria,
-            unidad: mat.unidad,
-            estado: mat.estado,
-            ofs_asociadas: [mat.of_id]
-          });
-        }
-      });
-      
-      setConsolidatedMaterials(Array.from(materialesMap.values()));
-      setShowMaterialModal(true);
-    } catch (error) {
-      console.error('Error al preparar materiales:', error);
-      toast.error('Error al consultar materiales');
-    }
-  };
-
-  const confirmarSolicitudMaterial = async () => {
-    try {
-      setProcessingMaterial(true);
-      
-      const { data: ofsCliente, error: ofsError } = await supabase
-        .from('fabrication_orders')
-        .select('id, sap_id, pedido_comercial')
-        .eq('customer', selectedCustomer);
-      
-      if (ofsError) throw ofsError;
-      
-      const ofIds = ofsCliente?.map(of => of.id) || [];
-      const pedidosUnicos = [...new Set(ofsCliente?.map(of => of.pedido_comercial).filter(Boolean))];
-      
-      for (const material of consolidatedMaterials) {
-        await supabase
-          .from('bom_items')
-          .update({ estado: 'solicitado' })
-          .eq('material_codigo', material.material_codigo)
-          .in('of_id', ofIds);
-      }
-      
-      await supabase
-        .from('fabrication_orders')
-        .update({ 
-          material_preparado: true,
-          material_solicitado_at: new Date().toISOString()
-        })
-        .in('id', ofIds);
-      
-      try {
-        await fetch('https://n8n-n8n.wgjrqh.easypanel.host/webhook/solicitud-material-produccion', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cliente: selectedCustomer,
-            pedidos: pedidosUnicos,
-            total_ofs: ofIds.length,
-            materiales: consolidatedMaterials,
-            solicitado_por: user?.email,
-            timestamp: new Date().toISOString()
-          })
-        });
-      } catch (webhookError) {
-        console.warn('Error webhook N8N:', webhookError);
-      }
-      
-      setShowMaterialModal(false);
-      toast.success(`Material solicitado correctamente para ${selectedCustomer}`);
-      fetchOrdersData();
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al solicitar material');
-    } finally {
-      setProcessingMaterial(false);
-    }
   };
 
   if (loading) {
@@ -354,22 +257,46 @@ const DashboardProduccion = () => {
         {/* Filtros */}
         <Card>
           <CardContent className="pt-6">
-            <div className="flex gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Fila 1 */}
+              <Input 
+                placeholder="Buscar por nº pedido..." 
+                value={filters.pedido}
+                onChange={(e) => setFilters({...filters, pedido: e.target.value})} 
+              />
               <Input 
                 placeholder="Buscar cliente..." 
                 value={filters.customer}
                 onChange={(e) => setFilters({...filters, customer: e.target.value})} 
-                className="max-w-xs"
               />
+              <Select 
+                value={filters.line} 
+                onValueChange={(val) => setFilters({...filters, line: val})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Línea de producción" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las líneas</SelectItem>
+                  <SelectItem value="sin_asignar">Sin asignar</SelectItem>
+                  {productionLines.map(line => (
+                    <SelectItem key={line.id} value={line.id}>
+                      {line.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {/* Fila 2 */}
               <Select 
                 value={filters.status} 
                 onValueChange={(val) => setFilters({...filters, status: val})}
               >
-                <SelectTrigger className="w-48">
+                <SelectTrigger>
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="all">Todos los estados</SelectItem>
                   <SelectItem value="pendiente">Pendiente</SelectItem>
                   <SelectItem value="en_proceso">En Proceso</SelectItem>
                   <SelectItem value="completada">Completada</SelectItem>
@@ -377,25 +304,43 @@ const DashboardProduccion = () => {
                   <SelectItem value="albarana">Albaranada</SelectItem>
                 </SelectContent>
               </Select>
+              <div>
+                <Input 
+                  type="date"
+                  placeholder="Fecha desde" 
+                  value={filters.fecha_desde}
+                  onChange={(e) => setFilters({...filters, fecha_desde: e.target.value})}
+                />
+              </div>
+              <div>
+                <Input 
+                  type="date"
+                  placeholder="Fecha hasta" 
+                  value={filters.fecha_hasta}
+                  onChange={(e) => setFilters({...filters, fecha_hasta: e.target.value})}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Tabla de Clientes/Pedidos */}
+        {/* Tabla de Pedidos */}
         <Card>
           <CardHeader>
-            <CardTitle>Órdenes por Cliente</CardTitle>
+            <CardTitle>Pedidos Comerciales</CardTitle>
           </CardHeader>
           <CardContent>
             {orders.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No se encontraron órdenes
+                No se encontraron pedidos
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Nº Pedido</TableHead>
                     <TableHead>Cliente</TableHead>
+                    <TableHead>Fecha</TableHead>
                     <TableHead>Total OFs</TableHead>
                     <TableHead>Completadas</TableHead>
                     <TableHead>En Proceso</TableHead>
@@ -407,7 +352,11 @@ const DashboardProduccion = () => {
                 <TableBody>
                   {orders.map((order, index) => (
                     <TableRow key={index}>
-                      <TableCell className="font-bold">{order.customer}</TableCell>
+                      <TableCell className="font-mono font-bold">{order.pedido_comercial}</TableCell>
+                      <TableCell>{order.customer}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {new Date(order.fecha_creacion).toLocaleDateString('es-ES')}
+                      </TableCell>
                       <TableCell>{order.total_ofs}</TableCell>
                       <TableCell className="text-green-600 font-semibold">
                         {order.completed_ofs}
@@ -433,10 +382,16 @@ const DashboardProduccion = () => {
                       <TableCell>
                         <Button 
                           size="sm" 
-                          onClick={() => setFilters({...filters, customer: order.customer})}
+                          onClick={() => {
+                            // Obtener el primer OF de este pedido para usar como pedidoId
+                            const firstOF = allOFs.find(of => of.pedido_comercial === order.pedido_comercial);
+                            if (firstOF) {
+                              navigate(`/dashboard/produccion/pedido/${firstOF.id}`);
+                            }
+                          }}
                         >
                           <Package2 className="mr-2 h-4 w-4" />
-                          Ver OFs
+                          Ver Pedido
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -446,152 +401,7 @@ const DashboardProduccion = () => {
             )}
           </CardContent>
         </Card>
-
-        {/* Lista de OFs (cuando hay filtro de cliente) */}
-        {filters.customer && allOFs.length > 0 && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Órdenes de Fabricación - {filters.customer}</CardTitle>
-                <div className="flex gap-2">
-                  <Button 
-                    size="sm"
-                    onClick={() => prepararMaterialCliente(filters.customer)}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Package className="mr-2 h-4 w-4" />
-                    Preparar Material
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setFilters({...filters, customer: ''})}
-                  >
-                    Limpiar filtro
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>SAP ID</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Línea</TableHead>
-                    <TableHead>Prioridad</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {allOFs.map(of => (
-                    <TableRow key={of.id}>
-                      <TableCell className="font-mono font-bold">
-                        {of.sap_id || 'N/A'}
-                      </TableCell>
-                      <TableCell>{of.customer}</TableCell>
-                      <TableCell>
-                        {of.line_name || (
-                          <span className="text-muted-foreground">No asignada</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={of.priority > 5 ? 'default' : 'outline'}>
-                          {of.priority || 0}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusVariant(of.status)}>
-                          {of.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button 
-                          size="sm" 
-                          onClick={() => navigate(`/dashboard/produccion/of/${of.id}`)}
-                        >
-                          Ver Detalle
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
       </div>
-
-      {/* Modal de Material Consolidado */}
-      <Dialog open={showMaterialModal} onOpenChange={setShowMaterialModal}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Preparar Material - {selectedCustomer}</DialogTitle>
-            <DialogDescription>
-              Materiales consolidados para todas las OFs del cliente
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="mt-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Cantidad Total</TableHead>
-                  <TableHead>Unidad</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead># OFs</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {consolidatedMaterials.map((material, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="font-mono">{material.material_codigo}</TableCell>
-                    <TableCell>{material.material_descripcion}</TableCell>
-                    <TableCell className="font-semibold">{material.cantidad_total}</TableCell>
-                    <TableCell>{material.unidad}</TableCell>
-                    <TableCell>
-                      <Badge variant={material.estado === 'solicitado' ? 'default' : 'secondary'}>
-                        {material.estado}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{material.ofs_asociadas.length}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          <DialogFooter className="mt-4">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowMaterialModal(false)}
-              disabled={processingMaterial}
-            >
-              Cancelar
-            </Button>
-            <Button 
-              onClick={confirmarSolicitudMaterial}
-              disabled={processingMaterial}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {processingMaterial ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Procesando...
-                </>
-              ) : (
-                <>
-                  <Package className="mr-2 h-4 w-4" />
-                  Solicitar a Logística
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

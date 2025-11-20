@@ -39,7 +39,7 @@ const DetallePedido = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  const [pedidoInfo, setPedidoInfo] = useState<{ customer: string; created_at: string; status: string } | null>(null);
+  const [pedidoInfo, setPedidoInfo] = useState<{ customer: string; created_at: string; status: string; pedido_comercial: string } | null>(null);
   const [ofs, setOfs] = useState<OF[]>([]);
   const [loading, setLoading] = useState(true);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
@@ -78,14 +78,14 @@ const DetallePedido = () => {
       // Obtener información inicial del pedido (primera OF)
       const { data: ofInicial, error: ofError } = await supabase
         .from('fabrication_orders')
-        .select('customer, created_at, status')
+        .select('customer, created_at, status, pedido_comercial')
         .eq('id', pedidoId)
         .single();
 
       if (ofError) throw ofError;
       setPedidoInfo(ofInicial);
 
-      // Obtener todas las OFs del mismo cliente
+      // Obtener todas las OFs del mismo PEDIDO COMERCIAL (no cliente)
       const { data: ofsData, error: ofsError } = await supabase
         .from('fabrication_orders')
         .select(`
@@ -95,12 +95,18 @@ const DetallePedido = () => {
           status,
           priority,
           line_id,
+          pedido_comercial,
           production_lines(name)
         `)
-        .eq('customer', ofInicial.customer)
+        .eq('pedido_comercial', ofInicial.pedido_comercial)
         .order('created_at', { ascending: true });
 
       if (ofsError) throw ofsError;
+      
+      // DEBUG: Ver datos cargados
+      console.log('📊 OFs cargadas:', ofsData);
+      console.log('📊 OFs con líneas:', ofsData?.filter(of => of.line_id));
+      
       setOfs(ofsData || []);
       
     } catch (error) {
@@ -268,14 +274,27 @@ const DetallePedido = () => {
     );
   }
 
-  const ofsNave1 = ofs.filter(of => of.almacen === 'NAVE_1');
-  const ofsNave2 = ofs.filter(of => of.almacen === 'NAVE_2');
+  const ofsEconordik = ofs.filter(of => of.production_lines?.name === 'ECONORDIK');
+  const ofsQuadrilateral = ofs.filter(of => of.production_lines?.name === 'QUADRILATERAL');
+  const ofsSinLinea = ofs.filter(of => !of.line_id);
+  
+  // DEBUG: Mostrar filtros de líneas
+  console.log('🔍 Filtrado de líneas:', {
+    total: ofs.length,
+    econordik: ofsEconordik.length,
+    quadrilateral: ofsQuadrilateral.length,
+    sinLinea: ofsSinLinea.length,
+    ejemploOF: ofs[0]
+  });
+  
   const ofsCompleted = ofs.filter(of => ['completada', 'validada', 'albarana'].includes(of.status)).length;
   const progressPercentage = (ofsCompleted / ofs.length) * 100;
   const todosMaterialPreparado = ofs.every(of => of.material_preparado);
 
-  // Si no hay campo almacen, mostrar todas juntas
-  const sinAlmacen = ofs.every(of => !of.almacen);
+  // Si la mayoría no tienen línea, mostrar todas juntas. Si algunas sí tienen, mostrar por separado
+  const mostrarPorLineas = ofsEconordik.length > 0 || ofsQuadrilateral.length > 0;
+  
+  console.log('📋 Mostrar por líneas:', mostrarPorLineas);
 
   return (
     <div className="space-y-6 p-8">
@@ -291,10 +310,14 @@ const DetallePedido = () => {
       {/* Info General del Pedido */}
       <Card>
         <CardHeader>
-          <CardTitle>Pedido - {pedidoInfo.customer}</CardTitle>
+          <CardTitle>Pedido {pedidoInfo.pedido_comercial} - {pedidoInfo.customer}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Nº Pedido Comercial</p>
+              <p className="font-mono font-bold text-lg">{pedidoInfo.pedido_comercial}</p>
+            </div>
             <div>
               <p className="text-sm text-muted-foreground">Fecha de Creación</p>
               <p className="font-bold">{new Date(pedidoInfo.created_at).toLocaleDateString('es-ES')}</p>
@@ -343,22 +366,12 @@ const DetallePedido = () => {
         </CardContent>
       </Card>
 
-      {/* Advertencia si falta campo almacen */}
-      {sinAlmacen && (
-        <Card className="border-orange-500 bg-orange-50">
-          <CardContent className="pt-6">
-            <p className="text-sm text-orange-800">
-              ⚠️ Configurar campo 'almacen' en base de datos para habilitar separación por naves
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Tabla OFs - Si no hay almacen, mostrar todas juntas */}
-      {sinAlmacen ? (
+      {/* Tabla de OFs */}
+      {!mostrarPorLineas ? (
+        // Si no hay líneas asignadas, mostrar todas las OFs juntas
         <Card>
           <CardHeader>
-            <CardTitle>📋 Órdenes de Fabricación</CardTitle>
+            <CardTitle>📋 Órdenes de Fabricación del Pedido</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -415,11 +428,14 @@ const DetallePedido = () => {
         </Card>
       ) : (
         <>
-          {/* Tabla NAVE 1 */}
-          {ofsNave1.length > 0 && (
+          {/* Tabla ECONORDIK */}
+          {ofsEconordik.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>🏭 NAVE 1</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  🏭 Línea ECONORDIK
+                  <Badge variant="secondary">{ofsEconordik.length} OFs</Badge>
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
