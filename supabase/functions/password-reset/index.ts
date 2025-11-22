@@ -219,6 +219,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
+    console.log('📥 Received request body:', JSON.stringify(body, null, 2));
     const { action, email, token, newPassword } = body;
     
     // Crear cliente Supabase con service_role key
