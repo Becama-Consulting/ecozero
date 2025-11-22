@@ -67,7 +67,7 @@ async function sendPasswordResetEmail(
         'Authorization': `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: 'EcoCero <onboarding@resend.dev>',
+        from: 'EcoCero <noreply@ecocero.t4tproyect.com>',
         to: email,
         subject: 'Recupera tu contraseña - EcoCero',
         reply_to: 'soporte@ecocero.t4tproyect.com',
