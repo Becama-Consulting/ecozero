@@ -339,131 +339,85 @@ const SecuritySettings = () => {
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Shield className="w-5 h-5" />
-          <CardTitle>Seguridad de la cuenta</CardTitle>
-        </div>
-        <CardDescription>
-          Gestiona la verificación en dos pasos (2FA) para proteger tu cuenta
-        </CardDescription>
-      </CardHeader>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
+      <Card className="w-full max-w-lg shadow-lg">
+        <CardHeader className="text-center space-y-2">
+          <div className="flex justify-center mb-2">
+            <div className="p-3 bg-orange-100 rounded-full">
+              <Shield className="w-8 h-8 text-orange-600" />
+            </div>
+          </div>
+          <CardTitle className="text-2xl">Seguridad de la cuenta</CardTitle>
+          <CardDescription>
+            Configuración de verificación en dos pasos (2FA)
+          </CardDescription>
+        </CardHeader>
 
-      <CardContent className="space-y-6">
-        {/* Estado actual de 2FA */}
-        <div className="flex items-start justify-between p-4 border rounded-lg">
-          <div className="flex items-start gap-3">
-            {twoFactorEnabled ? (
-              <ShieldCheck className="w-5 h-5 text-green-500 mt-0.5" />
-            ) : (
-              <ShieldOff className="w-5 h-5 text-muted-foreground mt-0.5" />
-            )}
-            <div>
-              <p className="font-medium">
-                Verificación en dos pasos (2FA)
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {twoFactorEnabled
-                  ? "Activa - Tu cuenta está protegida con 2FA"
-                  : "Inactiva - Se recomienda activar 2FA para mayor seguridad"}
-              </p>
-              {twoFactorEnabled && (
-                <div className="mt-2 flex gap-2">
-                  <Dialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <ShieldOff className="w-4 h-4 mr-2" />
-                        Desactivar
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Desactivar verificación en dos pasos</DialogTitle>
-                        <DialogDescription>
-                          Para desactivar 2FA, confirma tu identidad introduciendo tu contraseña actual.
-                        </DialogDescription>
-                      </DialogHeader>
+        <CardContent className="space-y-6">
+          {/* Alerta obligatoria cuando force2fa=true */}
+          {force2fa && !twoFactorEnabled && (
+            <Alert className="border-orange-500 bg-orange-50">
+              <AlertCircle className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-900">
+                <strong>⚠️ Configuración obligatoria:</strong> Por políticas de seguridad corporativa, 
+                debes activar la autenticación de dos factores para acceder al sistema.
+              </AlertDescription>
+            </Alert>
+          )}
 
-                      <div className="space-y-4 py-4">
-                        <Alert variant="destructive">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            Al desactivar 2FA, tu cuenta será menos segura.
-                          </AlertDescription>
-                        </Alert>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="disable-password">Contraseña actual</Label>
-                          <Input
-                            id="disable-password"
-                            type="password"
-                            placeholder="••••••••"
-                            value={disablePassword}
-                            onChange={(e) => setDisablePassword(e.target.value)}
-                            disabled={disabling}
-                          />
-                        </div>
-                      </div>
-
-                      <DialogFooter>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setShowDisableDialog(false);
-                            setDisablePassword("");
-                          }}
-                          disabled={disabling}
-                        >
-                          Cancelar
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          onClick={handleDisable2FA}
-                          disabled={disabling}
-                        >
-                          {disabling ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Desactivando...
-                            </>
-                          ) : (
-                            "Desactivar 2FA"
-                          )}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-
-                  <Button variant="outline" size="sm" onClick={handleStartSetup}>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Regenerar código
-                  </Button>
+          {/* Estado actual de 2FA - Centrado */}
+          <div className="text-center space-y-4 py-6">
+            <div className="flex justify-center">
+              {twoFactorEnabled ? (
+                <div className="p-4 bg-green-100 rounded-full">
+                  <ShieldCheck className="w-12 h-12 text-green-600" />
+                </div>
+              ) : (
+                <div className="p-4 bg-gray-100 rounded-full">
+                  <ShieldOff className="w-12 h-12 text-gray-400" />
                 </div>
               )}
             </div>
-          </div>
+            
+            <div>
+              <h3 className="text-lg font-semibold mb-2">
+                {twoFactorEnabled ? "2FA Activado" : "2FA Inactivo"}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {twoFactorEnabled
+                  ? "Tu cuenta está protegida con verificación en dos pasos"
+                  : "Activa 2FA para proteger tu cuenta con un código adicional"}
+              </p>
+            </div>
 
-          {!twoFactorEnabled && (
-            <Dialog open={showSetupDialog} onOpenChange={setShowSetupDialog}>
-              <DialogTrigger asChild>
-                <Button onClick={handleStartSetup}>
-                  <Shield className="w-4 h-4 mr-2" />
-                  Activar 2FA
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
+            {/* Botones de acción */}
+            <div className="flex flex-col gap-3 pt-4">
+              {!twoFactorEnabled ? (
+                <Dialog open={showSetupDialog} onOpenChange={setShowSetupDialog}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      onClick={handleStartSetup}
+                      className="w-full bg-orange-600 hover:bg-orange-700 text-white py-6 text-lg"
+                      size="lg"
+                    >
+                      <Shield className="w-5 h-5 mr-2" />
+                      Activar 2FA
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>Configurar verificación en dos pasos</DialogTitle>
                   <DialogDescription>
@@ -558,20 +512,94 @@ const SecuritySettings = () => {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          )}
-        </div>
+          ) : (
+            <div className="space-y-3">
+              <Dialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="w-full" size="lg">
+                    <ShieldOff className="w-5 h-5 mr-2" />
+                    Desactivar 2FA
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Desactivar verificación en dos pasos</DialogTitle>
+                    <DialogDescription>
+                      Para desactivar 2FA, confirma tu identidad introduciendo tu contraseña actual.
+                    </DialogDescription>
+                  </DialogHeader>
 
-        {/* Información adicional */}
-        <div className="bg-muted p-4 rounded-lg border">
-          <p className="text-sm font-medium mb-2">¿Qué es la verificación en dos pasos?</p>
-          <p className="text-xs text-muted-foreground">
-            La verificación en dos pasos (2FA) añade una capa extra de seguridad a tu cuenta. 
-            Además de tu contraseña, necesitarás introducir un código de 6 dígitos generado 
-            por una aplicación de autenticación en tu teléfono.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+                  <div className="space-y-4 py-4">
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Al desactivar 2FA, tu cuenta será menos segura.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="disable-password">Contraseña actual</Label>
+                      <Input
+                        id="disable-password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={disablePassword}
+                        onChange={(e) => setDisablePassword(e.target.value)}
+                        disabled={disabling}
+                      />
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowDisableDialog(false);
+                        setDisablePassword("");
+                      }}
+                      disabled={disabling}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={handleDisable2FA}
+                      disabled={disabling}
+                    >
+                      {disabling ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Desactivando...
+                        </>
+                      ) : (
+                        "Desactivar 2FA"
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <Button variant="outline" className="w-full" size="lg" onClick={handleStartSetup}>
+                <RefreshCw className="w-5 h-5 mr-2" />
+                Regenerar código
+              </Button>
+            </div>
+          )}
+            </div>
+
+            {/* Información adicional */}
+            <div className="bg-muted p-4 rounded-lg border">
+              <p className="text-sm font-medium mb-2">¿Qué es la verificación en dos pasos?</p>
+              <p className="text-xs text-muted-foreground">
+                La verificación en dos pasos (2FA) añade una capa extra de seguridad a tu cuenta. 
+                Además de tu contraseña, necesitarás introducir un código de 6 dígitos generado 
+                por una aplicación de autenticación en tu teléfono.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
