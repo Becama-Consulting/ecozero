@@ -42,7 +42,7 @@ async function sendPasswordResetEmail(
   token: string
 ): Promise<boolean> {
   try {
-    const siteUrl = Deno.env.get('SITE_URL') || 'http://localhost:8080';
+    const siteUrl = Deno.env.get('SITE_URL') || 'http://localhost:5173';
     const resetUrl = `${siteUrl}/auth/reset-password/${token}`;
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     

@@ -10,8 +10,9 @@
  * Este componente debe integrarse en una página de perfil/ajustes del usuario.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,11 @@ import QRCode from "qrcode";
 const SecuritySettings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // Detectar si se fuerza la configuración de 2FA
+  const force2fa = searchParams.get('force2fa') === 'true';
   
   const [loading, setLoading] = useState(true);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
@@ -43,11 +49,96 @@ const SecuritySettings = () => {
   const [disablePassword, setDisablePassword] = useState("");
   const [disabling, setDisabling] = useState(false);
 
+  // ACTIVAR 2FA: Generar secreto y QR usando Edge Function
+  const handleStartSetup = useCallback(async () => {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      console.log('🔑 Verificando sesión para 2FA:', { 
+        hasSession: !!session, 
+        hasAccessToken: !!session?.access_token,
+        sessionError 
+      });
+
+      if (sessionError || !session || !session.access_token) {
+        console.error('❌ Error de sesión:', sessionError);
+        toast({
+          variant: "destructive",
+          title: "Error de sesión",
+          description: "Por favor, cierra sesión y vuelve a iniciar sesión",
+        });
+        return;
+      }
+
+      // Llamar a la Edge Function para generar el secreto
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      console.log('📡 Llamando a Edge Function:', `${supabaseUrl}/functions/v1/two-factor-auth`);
+      
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/two-factor-auth`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ action: 'generate' }),
+        }
+      );
+
+      const data = await response.json();
+
+      console.log('📡 Respuesta Edge Function:', { status: response.status, data });
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error generando secreto 2FA');
+      }
+
+      const { secret: secretBase32, qrCodeUrl: otpauthUrl } = data;
+      
+      setSecret(secretBase32);
+
+      // Generar código QR para escanear con Google Authenticator
+      const qrCode = await QRCode.toDataURL(otpauthUrl);
+      setQrCodeUrl(qrCode);
+
+      setShowSetupDialog(true);
+
+    } catch (error: any) {
+      console.error('Error generando secreto 2FA:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "No se pudo generar el código 2FA",
+      });
+    }
+  }, [toast]);
+
   useEffect(() => {
     if (user) {
       loadSecuritySettings();
     }
   }, [user]);
+
+  // Si force2fa=true y NO tiene 2FA, abrir automáticamente el diálogo después de cargar
+  useEffect(() => {
+    if (force2fa && !twoFactorEnabled && !loading && user) {
+      // Esperar un momento para asegurar que la sesión esté lista
+      const timer = setTimeout(() => {
+        console.log('🔐 Abriendo diálogo de 2FA obligatorio...');
+        handleStartSetup();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [force2fa, twoFactorEnabled, loading, user, handleStartSetup]);
+
+  // Si force2fa=true y el usuario ya tiene 2FA, quitar el parámetro
+  useEffect(() => {
+    if (force2fa && twoFactorEnabled && !loading) {
+      navigate('/profile/security', { replace: true });
+    }
+  }, [force2fa, twoFactorEnabled, loading, navigate]);
 
   // Cargar estado actual de 2FA del usuario
   const loadSecuritySettings = async () => {
@@ -70,41 +161,6 @@ const SecuritySettings = () => {
     }
   };
 
-  // ACTIVAR 2FA: Generar secreto y QR usando Edge Function
-  const handleStartSetup = async () => {
-    try {
-      // Llamar a la Edge Function para generar el secreto en el backend
-      const { data, error } = await supabase.functions.invoke('generate-2fa-secret', {
-        body: { 
-          userId: user!.id, 
-          email: user!.email 
-        },
-      });
-
-      if (error) {
-        throw new Error('Error generando secreto 2FA');
-      }
-
-      const { secret: secretBase32, otpauthUrl } = data;
-      
-      setSecret(secretBase32);
-
-      // Generar código QR para escanear con Google Authenticator
-      const qrCode = await QRCode.toDataURL(otpauthUrl);
-      setQrCodeUrl(qrCode);
-
-      setShowSetupDialog(true);
-
-    } catch (error) {
-      console.error('Error generando secreto 2FA:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudo generar el código 2FA",
-      });
-    }
-  };
-
   // Verificar código y guardar el secreto en BD
   const handleVerifySetup = async () => {
     if (verificationCode.length !== 6) {
@@ -119,46 +175,39 @@ const SecuritySettings = () => {
     setVerifyingSetup(true);
 
     try {
-      // VERIFICAR el código TOTP usando Edge Function
-      const { data, error } = await supabase.functions.invoke('verify-totp', {
-        body: {
-          code: verificationCode,
-          secret: secret, // Pasamos el secreto temporal para verificar antes de guardar
-        },
-      });
-
-      if (error) {
-        throw new Error('Error verificando código');
-      }
-
-      if (!data.valid) {
-        toast({
-          variant: "destructive",
-          title: "Código incorrecto",
-          description: "El código no es válido. Verifica que esté sincronizado con la app.",
-        });
-        setVerifyingSetup(false);
-        return;
-      }
-
-      // Guardar el secreto en la BD
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          two_factor_enabled: true,
-          two_factor_secret: secret,
-        })
-        .eq('id', user!.id);
-
-      if (updateError) {
-        console.error('Error guardando 2FA:', updateError);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "No se pudo activar la verificación en dos pasos",
+          description: "No hay sesión activa",
         });
         setVerifyingSetup(false);
         return;
+      }
+
+      // VERIFICAR el código TOTP y ACTIVAR 2FA usando Edge Function
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/two-factor-auth`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'enable',
+            code: verificationCode,
+            secret: secret,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Código incorrecto');
       }
 
       console.log('✅ 2FA activado correctamente');
@@ -172,12 +221,34 @@ const SecuritySettings = () => {
       setShowSetupDialog(false);
       setVerificationCode("");
 
-    } catch (error) {
+      // Si era obligatorio (force2fa=true), redirigir al dashboard correspondiente
+      if (force2fa) {
+        console.log('🔐 2FA configurado obligatoriamente, redirigiendo...');
+        
+        // Obtener roles del usuario para redirección
+        const { data: userRoles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user!.id);
+
+        // Esperar 1 segundo para que el usuario vea el toast
+        setTimeout(() => {
+          if (userRoles?.some(r => r.role === 'admin_global')) {
+            navigate('/admin/dashboard', { replace: true });
+          } else if (userRoles?.some(r => r.role === 'supervisor')) {
+            navigate('/dashboard/produccion/supervisor', { replace: true });
+          } else {
+            navigate('/dashboard/produccion', { replace: true });
+          }
+        }, 1500);
+      }
+
+    } catch (error: any) {
       console.error('Error verificando 2FA:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Ocurrió un error al verificar el código",
+        description: error.message || "Ocurrió un error al verificar el código",
       });
     } finally {
       setVerifyingSetup(false);

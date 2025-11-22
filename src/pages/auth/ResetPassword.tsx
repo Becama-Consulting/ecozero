@@ -132,19 +132,23 @@ const ResetPassword = () => {
 
       console.log('✅ Contraseña actualizada correctamente');
       
-      setSuccess(true);
+      // Cerrar sesión para forzar login con nueva contraseña
+      await supabase.auth.signOut();
       
       toast({
         title: "Contraseña actualizada",
-        description: data.message || "Tu contraseña se ha actualizado correctamente",
+        description: "Por seguridad, inicia sesión con tu nueva contraseña",
       });
 
-      // Redirigir al login después de 3 segundos
-      setTimeout(() => {
-        navigate("/auth");
-      }, 3000);
+      // Guardar flag para activar 2FA después del próximo login
+      sessionStorage.setItem('require2faSetup', 'true');
 
-    } catch (error) {
+      // Redirigir al login después de 2 segundos
+      setTimeout(() => {
+        navigate('/auth?require2fa=true');
+      }, 2000);
+
+    } catch (error: any) {
       console.error('Error en reset password:', error);
       toast({
         variant: "destructive",
@@ -228,7 +232,7 @@ const ResetPassword = () => {
     );
   }
 
-  // Estado: Contraseña actualizada con éxito
+  // Estado: Contraseña actualizada con éxito - ya no se usa, redirige directo a 2FA
   if (success) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-success/10 via-background to-info/10 p-4">

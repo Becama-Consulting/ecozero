@@ -260,7 +260,7 @@ const DashboardProduccion = () => {
               <CardTitle className="text-sm font-medium text-muted-foreground">Pendientes</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-600">
+              <div className="text-2xl font-bold text-orange-500">
                 {allOFs.filter(of => of.status === 'pendiente').length}
               </div>
             </CardContent>
@@ -374,10 +374,10 @@ const DashboardProduccion = () => {
                       <TableCell className="text-green-600 font-semibold">
                         {order.completed_ofs}
                       </TableCell>
-                      <TableCell className="text-blue-600 font-semibold">
+                      <TableCell className="text-orange-500 font-semibold">
                         {order.in_progress_ofs}
                       </TableCell>
-                      <TableCell className="text-orange-600 font-semibold">
+                      <TableCell className="text-orange-500 font-semibold">
                         {order.pending_ofs}
                       </TableCell>
                       <TableCell>
@@ -429,6 +429,15 @@ const DashboardProduccion = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal de detalle de OF */}
+      {selectedOrder && (
+        <ProductionOrderDetailModal 
+          isOpen={isDetailModalOpen}
+          onClose={closeDetailModal}
+          order={selectedOrder}
+        />
+      )}
     </div>
   );
 };

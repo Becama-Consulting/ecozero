@@ -3,10 +3,12 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useAutoLogout } from "@/hooks/useAutoLogout";
 import Auth from "./pages/auth/Auth.tsx";
 import TwoFactorVerification from "./pages/auth/TwoFactorVerification";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
+import VerifyEmail from "./pages/auth/VerifyEmail";
 import SecuritySettings from "./pages/profile/SecuritySettings";
 import AdminUsers from "./pages/admin/AdminUsers";
 import DashboardGlobal from "./pages/admin/DashboardGlobal";
@@ -25,26 +27,23 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter
-        future={{
-          v7_startTransition: true,
-          v7_relativeSplatPath: true,
-        }}
-      >
-        <Routes>
-          {/* ========================================
-              RUTAS DE AUTENTICACIÓN Y SEGURIDAD
-              ======================================== */}
-          {/* Login principal */}
-          <Route path="/auth" element={<Auth />} />
+const AppContent = () => {
+  // Hook para cerrar sesión al cerrar pestaña/ventana (seguridad corporativa)
+  useAutoLogout();
+
+  return (
+    <Routes>
+      {/* ========================================
+          RUTAS DE AUTENTICACIÓN Y SEGURIDAD
+          ======================================== */}
+      {/* Login principal */}
+      <Route path="/auth" element={<Auth />} />
           
           {/* Verificación en dos pasos (2FA) */}
           <Route path="/auth/2fa" element={<TwoFactorVerification />} />
+          
+          {/* Verificación de email */}
+          <Route path="/auth/verify-email" element={<VerifyEmail />} />
           
           {/* Recuperación de contraseña */}
           <Route path="/auth/forgot-password" element={<ForgotPassword />} />
@@ -222,6 +221,16 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+      );
+    };
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <AppContent />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

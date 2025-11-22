@@ -239,7 +239,7 @@ const DetallePedido = () => {
       case 'albarana':
         return <Badge className="bg-green-800 text-white hover:bg-green-900">📋 Albaranada</Badge>;
       case 'en_proceso':
-        return <Badge className="bg-blue-600 text-white hover:bg-blue-700">⚙️ En Proceso</Badge>;
+        return <Badge className="bg-orange-500 text-white hover:bg-orange-600">⛙️ En Proceso</Badge>;
       case 'pendiente':
         return <Badge className="bg-orange-500 text-white hover:bg-orange-600">⏳ Pendiente</Badge>;
       case 'material_solicitado':
@@ -322,19 +322,19 @@ const DetallePedido = () => {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Progreso Global</p>
-              <Progress value={progressPercentage} className="mt-2" />
-              <p className="text-xs mt-1 text-right">{ofsCompleted}/{ofs.length} completadas</p>
+              <Progress value={progressPercentage} className="mt-2 h-3" />
+              <p className="text-xs mt-1 text-right font-semibold">{ofsCompleted}/{ofs.length} completadas ({Math.round(progressPercentage)}%)</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Botón Preparar Material */}
-      <Card className="border-blue-500 bg-blue-50">
+      <Card className="border-orange-500 bg-orange-50">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
-              <Package className="h-8 w-8 text-blue-600" />
+              <Package className="h-8 w-8 text-orange-600" />
               <div>
                 <h3 className="font-bold text-lg">Preparar Material del Pedido</h3>
                 <p className="text-sm text-muted-foreground">
@@ -345,7 +345,7 @@ const DetallePedido = () => {
             <Button 
               onClick={prepararMaterialPedido}
               disabled={todosMaterialPreparado}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-orange-600 hover:bg-orange-700"
             >
               <Package className="mr-2 h-4 w-4" />
               {todosMaterialPreparado ? 'Material Ya Solicitado' : 'Preparar Material'}
@@ -420,7 +420,7 @@ const DetallePedido = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   🏭 Línea ECONORDIK
-                  <Badge variant="secondary">{ofsEconordik.length} OFs</Badge>
+                  <Badge className="bg-orange-500 text-white">{ofsEconordik.length} OFs</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -482,7 +482,7 @@ const DetallePedido = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   🏭 Línea QUADRILATERAL
-                  <Badge variant="secondary">{ofsQuadrilateral.length} OFs</Badge>
+                  <Badge className="bg-orange-500 text-white">{ofsQuadrilateral.length} OFs</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -654,7 +654,7 @@ const DetallePedido = () => {
             <Button 
               onClick={confirmarSolicitudMaterial}
               disabled={processingMaterial}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-orange-600 hover:bg-orange-700"
             >
               {processingMaterial ? (
                 <>

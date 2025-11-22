@@ -19,56 +19,74 @@ const Auth = () => {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
-  // Redirect según rol - solo UNA VEZ usando sessionStorage
+  // Redirect según rol - AHORA VERIFICA 2FA OBLIGATORIO
   useEffect(() => {
-    const hasRedirected = sessionStorage.getItem('hasRedirected');
-    
     console.log('🔍 Auth useEffect triggered:', {
       authLoading,
       hasUser: !!user,
       userRolesLength: userRoles.length,
-      userRoles: userRoles,
-      hasRedirected
+      userRoles: userRoles
     });
 
-    // Si llegamos aquí con hasRedirected=true significa que algo falló
-    // Limpiar el flag y permitir reintento
-    if (hasRedirected && !authLoading && user && userRoles.length > 0) {
-      console.log('🔄 Usuario autenticado pero volvió a /auth, limpiando flag y reintentando...');
-      sessionStorage.removeItem('hasRedirected');
-      return; // Esperar al siguiente render sin el flag
-    }
+    if (!authLoading && user && userRoles.length > 0) {
+      // Verificar si debe configurar 2FA obligatoriamente
+      const require2faSetup = sessionStorage.getItem('require2faSetup');
+      
+      if (require2faSetup === 'true') {
+        console.log('🔒 Usuario debe configurar 2FA obligatoriamente (post password reset)');
+        sessionStorage.removeItem('require2faSetup');
+        navigate('/profile/security?force2fa=true', { replace: true });
+        return;
+      }
+      
+      // 🔐 NUEVO: Verificar si el usuario tiene 2FA configurado (OBLIGATORIO)
+      const check2FAStatus = async () => {
+        try {
+          // Pequeña espera para asegurar que la sesión esté completamente establecida
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('two_factor_enabled')
+            .eq('id', user.id)
+            .single();
 
-    if (!authLoading && user && !hasRedirected) {
-      // Si no hay roles aún, esperar un poco
+          if (!profile?.two_factor_enabled) {
+            // Usuario NO tiene 2FA configurado → FORZAR configuración
+            console.log('⚠️ 2FA NO CONFIGURADO - Forzando configuración obligatoria');
+            navigate('/profile/security?force2fa=true', { replace: true });
+            return;
+          }
+
+          // Usuario tiene 2FA configurado → redirigir según rol
+          console.log('✅ Usuario autenticado con 2FA activo, redirigiendo según rol...');
+          
+          if (userRoles.some(r => r.role === 'admin_global')) {
+            navigate('/admin/dashboard', { replace: true });
+          } else if (userRoles.some(r => r.role === 'supervisor')) {
+            navigate('/dashboard/produccion/supervisor', { replace: true });
+          } else {
+            navigate('/dashboard/produccion', { replace: true });
+          }
+        } catch (error) {
+          console.error('Error verificando 2FA:', error);
+        }
+      };
+
+      check2FAStatus();
+    } else if (!authLoading && user && userRoles.length === 0) {
+      // Usuario autenticado pero sin roles aún, esperar un poco
+      console.log('⏳ Usuario autenticado pero sin roles, esperando...');
+      setShowLoadingScreen(true);
       
-      if (userRoles.length === 0) {
-        setShowLoadingScreen(true);        // Después de 3 segundos, redirigir aunque no haya roles
-        const timeout = setTimeout(() => {
-          sessionStorage.setItem('hasRedirected', 'true');
-          setShowLoadingScreen(false);
-          navigate('/dashboard/produccion', { replace: true });
-        }, 3000);
-        
-        return () => {
-          clearTimeout(timeout);
-        };
-      }
-      
-      // Ya hay roles, redirigir inmediatamente
-      sessionStorage.setItem('hasRedirected', 'true');
-      setShowLoadingScreen(false);
-      
-      if (userRoles.some(r => r.role === 'admin_global')) {
-        navigate('/admin/dashboard', { replace: true });
-      } else if (userRoles.some(r => r.role === 'supervisor')) {
-        navigate('/dashboard/produccion/supervisor', { replace: true });
-      } else {
+      const timeout = setTimeout(() => {
+        // Si después de 3 segundos no hay roles, redirigir a producción por defecto
+        console.log('⏱️ Timeout: redirigiendo a producción por defecto');
+        setShowLoadingScreen(false);
         navigate('/dashboard/produccion', { replace: true });
-      }
-    } else if (hasRedirected && (!user || userRoles.length === 0)) {
-      // Si hasRedirected está true pero no hay user/roles, limpiar
-      sessionStorage.removeItem('hasRedirected');
+      }, 3000);
+      
+      return () => clearTimeout(timeout);
     }
   }, [authLoading, user, userRoles, navigate]);
 
@@ -83,9 +101,6 @@ const Auth = () => {
     console.log('🔐 Iniciando login...');
     setLoading(true);
     setShowLoadingScreen(true);
-    
-    // Limpiar flag de redirect previo
-    sessionStorage.removeItem('hasRedirected');
     
     // PASO 1: Validar email + contraseña
     const { error } = await signIn(loginEmail.trim(), loginPassword);
@@ -122,9 +137,7 @@ const Auth = () => {
         // Usuario tiene 2FA: redirigir a pantalla de verificación TOTP
         console.log('🔐 Usuario tiene 2FA activo, redirigiendo a verificación...');
         
-        // Cerrar la sesión temporalmente hasta que complete 2FA
-        await supabase.auth.signOut();
-        
+        // NO cerrar la sesión - mantenerla para verificar el código 2FA
         navigate('/auth/2fa', { 
           state: { 
             userId: userId,
@@ -132,6 +145,7 @@ const Auth = () => {
           },
           replace: true 
         });
+        return; // Importante: salir aquí para no continuar con el flujo normal
       } else {
         // Usuario NO tiene 2FA: continuar con login normal
         console.log('✅ Login exitoso sin 2FA, preparando redirect...');
