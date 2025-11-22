@@ -67,7 +67,7 @@ async function sendPasswordResetEmail(
         'Authorization': `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: 'onboarding@resend.dev',
+        from: 'EcoCero <no-reply@ecocero.com>',
         to: email,
         subject: 'Recupera tu contraseña - EcoCero',
         html: `
@@ -219,7 +219,6 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    console.log('📥 Received request body:', JSON.stringify(body, null, 2));
     const { action, email, token, newPassword } = body;
     
     // Crear cliente Supabase con service_role key
