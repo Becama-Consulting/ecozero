@@ -170,7 +170,7 @@ serve(async (req) => {
         label: user.email || 'Usuario',
         algorithm: 'SHA1',
         digits: 6,
-        period: 30,
+        period: 60,
         secret: OTPAuth.Secret.fromBase32(newSecret),
       });
 
@@ -217,7 +217,7 @@ serve(async (req) => {
         label: user.email || 'Usuario',
         algorithm: 'SHA1',
         digits: 6,
-        period: 30,
+        period: 60,
         secret: OTPAuth.Secret.fromBase32(secret),
       });
 
@@ -321,7 +321,7 @@ serve(async (req) => {
         label: user.email || 'Usuario',
         algorithm: 'SHA1',
         digits: 6,
-        period: 30,
+        period: 60,
         secret: OTPAuth.Secret.fromBase32(profile.two_factor_secret),
       });
 
