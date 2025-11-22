@@ -186,6 +186,14 @@ const SecuritySettings = () => {
         return;
       }
 
+      console.log('🔐 Enviando verificación 2FA:', {
+        codeLength: verificationCode.length,
+        code: verificationCode,
+        secretLength: secret?.length,
+        secretPrefix: secret?.substring(0, 10) + '...',
+        hasSession: !!session,
+      });
+
       // VERIFICAR el código TOTP y ACTIVAR 2FA usando Edge Function
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const response = await fetch(

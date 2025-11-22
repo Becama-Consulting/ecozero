@@ -164,14 +164,14 @@ serve(async (req) => {
       // Generar secreto base32
       const newSecret = generateSecret();
       
-      // Crear instancia TOTP
+      // Crear instancia TOTP con Secret como objeto
       const totp = new OTPAuth.TOTP({
         issuer: 'EcoCERO',
         label: user.email || 'Usuario',
         algorithm: 'SHA1',
         digits: 6,
         period: 30,
-        secret: newSecret,
+        secret: OTPAuth.Secret.fromBase32(newSecret),
       });
 
       // Generar URI para el QR code
@@ -197,28 +197,44 @@ serve(async (req) => {
     // ==========================================
     if (action === 'enable') {
       if (!code || !secret) {
+        console.error('❌ Código o secreto faltante:', { hasCode: !!code, hasSecret: !!secret });
         return new Response(
           JSON.stringify({ error: 'Código y secreto requeridos' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Crear instancia TOTP con el secreto proporcionado
+      console.log('🔐 Validando código 2FA:', {
+        userId: user.id,
+        codeLength: code.length,
+        secretLength: secret.length,
+        secretPrefix: secret.substring(0, 4) + '...'
+      });
+
+      // Crear instancia TOTP con el secreto proporcionado como objeto Secret
       const totp = new OTPAuth.TOTP({
         issuer: 'EcoCERO',
         label: user.email || 'Usuario',
         algorithm: 'SHA1',
         digits: 6,
         period: 30,
-        secret: secret,
+        secret: OTPAuth.Secret.fromBase32(secret),
       });
 
-      // Validar código con ventana de +/- 1 periodo (90 segundos total)
-      const delta = totp.validate({ token: code, window: 1 });
+      // Generar el código actual para debugging
+      const currentCode = totp.generate();
+      console.log('📱 Código esperado:', currentCode);
+      console.log('📥 Código recibido:', code);
+
+      // Validar código con ventana de +/- 2 periodos (150 segundos total = 5 minutos)
+      const delta = totp.validate({ token: code, window: 2 });
+
+      console.log('✅ Resultado validación:', { delta, isValid: delta !== null });
 
       if (delta === null) {
+        console.error('❌ Código inválido');
         return new Response(
-          JSON.stringify({ success: false, error: 'Código inválido o expirado' }),
+          JSON.stringify({ success: false, error: 'Código inválido o expirado. Intenta con el código actual.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -306,7 +322,7 @@ serve(async (req) => {
         algorithm: 'SHA1',
         digits: 6,
         period: 30,
-        secret: profile.two_factor_secret,
+        secret: OTPAuth.Secret.fromBase32(profile.two_factor_secret),
       });
 
       const delta = totp.validate({ token: code, window: 1 });
